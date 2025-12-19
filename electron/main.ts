@@ -1274,24 +1274,31 @@ ipcMain.handle('generate-video', async (_event, projectId: string): Promise<{ su
 
       const slideVideoPath = join(tempDir, `slide_${i.toString().padStart(3, '0')}.mp4`)
 
-      // Determine the image source for this slide
+      // Look for rendered PNG first (created by frontend)
+      const renderedPngPath = join(projectDir, 'slides', `slide_${slide.slideNum.toString().padStart(3, '0')}.png`)
+
       let imageInput: string
       let inputOptions: string[] = ['-loop', '1']
 
-      // Check for visual image first
-      const visualPath = slide.visualData?.imagePath
-      if (visualPath && existsSync(visualPath)) {
-        imageInput = visualPath
-        console.log(`  Using visual image: ${visualPath}`)
-      } else if (slide.backgroundType === 'image' && slide.backgroundImagePath && existsSync(slide.backgroundImagePath)) {
-        imageInput = slide.backgroundImagePath
-        console.log(`  Using background image: ${slide.backgroundImagePath}`)
+      if (existsSync(renderedPngPath)) {
+        imageInput = renderedPngPath
+        console.log(`  Using rendered PNG: ${renderedPngPath}`)
       } else {
-        // Create a solid color image using ffmpeg
-        const bgColor = slide.backgroundColor || '#1a1a2e'
-        imageInput = `color=c=${bgColor.replace('#', '')}:s=${width}x${height}:d=1`
-        inputOptions = ['-f', 'lavfi']
-        console.log(`  Using solid color: ${bgColor}`)
+        // Fallback: Check for visual image
+        const visualPath = slide.visualData?.imagePath
+        if (visualPath && existsSync(visualPath)) {
+          imageInput = visualPath
+          console.log(`  Using visual image: ${visualPath}`)
+        } else if (slide.backgroundType === 'image' && slide.backgroundImagePath && existsSync(slide.backgroundImagePath)) {
+          imageInput = slide.backgroundImagePath
+          console.log(`  Using background image: ${slide.backgroundImagePath}`)
+        } else {
+          // Create a solid color image using ffmpeg
+          const bgColor = slide.backgroundColor || '#1a1a2e'
+          imageInput = `color=c=${bgColor.replace('#', '')}:s=${width}x${height}:d=1`
+          inputOptions = ['-f', 'lavfi']
+          console.log(`  Using solid color: ${bgColor}`)
+        }
       }
 
       const duration = slide.audioDuration || slide.duration || 5
@@ -1502,6 +1509,31 @@ ipcMain.handle('assemble-video', async (event, slides: SlideVideo[], outputPath:
     return { success: true, data: outputPath }
   } catch (e: any) {
     console.error('Video assembly error:', e)
+    return { success: false, error: e.message }
+  }
+})
+
+// ============================================
+// SLIDE RENDERING
+// ============================================
+
+ipcMain.handle('save-slide-png', async (_event, projectId: string, slideNum: number, dataUrl: string): Promise<{ success: boolean; data?: string; error?: string }> => {
+  try {
+    const projectDir = join(app.getPath('userData'), 'projects', projectId)
+    const slidesDir = join(projectDir, 'slides')
+    mkdirSync(slidesDir, { recursive: true })
+
+    const pngPath = join(slidesDir, `slide_${slideNum.toString().padStart(3, '0')}.png`)
+
+    // Convert data URL to buffer and save
+    const base64Data = dataUrl.replace(/^data:image\/png;base64,/, '')
+    const buffer = Buffer.from(base64Data, 'base64')
+    writeFileSync(pngPath, buffer)
+
+    console.log(`Saved slide ${slideNum} PNG to:`, pngPath)
+    return { success: true, data: pngPath }
+  } catch (e: any) {
+    console.error('Error saving slide PNG:', e)
     return { success: false, error: e.message }
   }
 })

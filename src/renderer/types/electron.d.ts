@@ -54,6 +54,9 @@ export interface ElectronAPI {
   // Video Generation
   generateVideo: (projectId: string) => Promise<{ success: boolean; data?: { path: string; duration: number }; error?: string }>
 
+  // Slide Rendering
+  saveSlidePng: (projectId: string, slideNum: number, dataUrl: string) => Promise<{ success: boolean; data?: string; error?: string }>
+
   // Video Assembly (Legacy)
   assembleVideo: (slides: SlideVideo[], outputPath: string, options: VideoOptions) => Promise<{ success: boolean; data?: string; error?: string }>
 

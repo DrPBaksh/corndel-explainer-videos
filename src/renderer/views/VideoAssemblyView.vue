@@ -170,13 +170,27 @@
         </div>
       </div>
     </div>
+
+    <!-- Hidden slide renderer (positioned off-screen) -->
+    <div
+      ref="slideRenderRef"
+      class="fixed"
+      style="left: -9999px; top: 0;"
+    >
+      <SlideCanvas
+        v-if="currentRenderSlide"
+        :slide="currentRenderSlide"
+      />
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, nextTick } from 'vue'
 import { useRoute } from 'vue-router'
 import { useProjectStore } from '../stores/projectStore'
+import SlideCanvas from '../components/SlideCanvas.vue'
+import html2canvas from 'html2canvas'
 import type { Slide } from '@shared/types'
 
 const route = useRoute()
@@ -191,6 +205,11 @@ const generatedSlides = ref<number[]>([])
 const videoPath = ref<string | null>(null)
 const videoDuration = ref(0)
 const errorMessage = ref<string | null>(null)
+
+// Slide rendering
+const slideRenderRef = ref<HTMLDivElement | null>(null)
+const currentRenderSlide = ref<Slide | null>(null)
+const isRendering = ref(false)
 
 onMounted(async () => {
   const projectId = route.params.id as string
@@ -253,24 +272,99 @@ function getSlideBackgroundStyle(slide: Slide): Record<string, string> {
   return { backgroundColor: slide.backgroundColor || '#ffffff' }
 }
 
+async function renderSlideToImage(slide: Slide): Promise<string | null> {
+  if (!slideRenderRef.value || !projectStore.project) return null
+
+  // Set the slide to render
+  currentRenderSlide.value = slide
+  isRendering.value = true
+
+  // Wait for Vue to update the DOM
+  await nextTick()
+
+  // Small delay to ensure images are loaded
+  await new Promise(resolve => setTimeout(resolve, 500))
+
+  try {
+    // Find the slide canvas element
+    const canvas = slideRenderRef.value.querySelector('.slide-canvas') as HTMLElement
+    if (!canvas) {
+      console.error('Could not find slide canvas element')
+      return null
+    }
+
+    // Capture the canvas
+    const capturedCanvas = await html2canvas(canvas, {
+      scale: 2.4, // 1920/800 = 2.4 for HD resolution
+      useCORS: true,
+      allowTaint: true,
+      backgroundColor: null
+    })
+
+    // Convert to data URL
+    const dataUrl = capturedCanvas.toDataURL('image/png')
+
+    // Save to file
+    const result = await window.electronAPI.saveSlidePng(
+      projectStore.project.id,
+      slide.slideNum,
+      dataUrl
+    )
+
+    if (result.success) {
+      console.log(`Slide ${slide.slideNum} rendered and saved`)
+      return result.data || null
+    } else {
+      console.error(`Failed to save slide ${slide.slideNum}:`, result.error)
+      return null
+    }
+  } catch (error) {
+    console.error(`Error rendering slide ${slide.slideNum}:`, error)
+    return null
+  } finally {
+    isRendering.value = false
+  }
+}
+
 async function generateVideo() {
   if (!projectStore.project || !canGenerate.value) return
 
   console.log('=== generateVideo called ===')
   isGenerating.value = true
   progress.value = 0
-  progressText.value = 'Preparing slides...'
+  progressText.value = 'Rendering slides...'
   generatedSlides.value = []
   currentSlideIndex.value = 0
   errorMessage.value = null
 
   try {
+    // First, render all slides to PNG
+    for (let i = 0; i < slides.value.length; i++) {
+      const slide = slides.value[i]
+      currentSlideIndex.value = i
+      progressText.value = `Rendering slide ${i + 1} of ${slides.value.length}...`
+      progress.value = (i / slides.value.length) * 30 // 30% for rendering
+
+      const pngPath = await renderSlideToImage(slide)
+      if (!pngPath) {
+        errorMessage.value = `Failed to render slide ${i + 1}`
+        return
+      }
+      generatedSlides.value.push(i)
+    }
+
+    progressText.value = 'Assembling video...'
+    progress.value = 35
+
+    // Now generate the video
     const result = await window.electronAPI.generateVideo(projectStore.project.id)
     console.log('generateVideo result:', result)
 
     if (result.success && result.data) {
       videoPath.value = result.data.path
       videoDuration.value = result.data.duration
+      progress.value = 100
+      progressText.value = 'Complete!'
 
       // Reload project to get updated status
       await projectStore.loadProject(projectStore.project.id)
@@ -283,6 +377,7 @@ async function generateVideo() {
   } finally {
     isGenerating.value = false
     currentSlideIndex.value = -1
+    currentRenderSlide.value = null
   }
 }
 

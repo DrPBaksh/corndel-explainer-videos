@@ -117,6 +117,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('assemble-video', slides, outputPath, options),
 
   // ============================================
+  // SLIDE RENDERING
+  // ============================================
+  saveSlidePng: (projectId: string, slideNum: number, dataUrl: string): Promise<{ success: boolean; data?: string; error?: string }> =>
+    ipcRenderer.invoke('save-slide-png', projectId, slideNum, dataUrl),
+
+  // ============================================
   // FILE DIALOGS
   // ============================================
   selectDocuments: (): Promise<{ success: boolean; data?: Array<{ fileName: string; content: string; mimeType: string }>; error?: string }> =>
