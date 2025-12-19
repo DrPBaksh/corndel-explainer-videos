@@ -231,9 +231,11 @@ async function generateSingleAudio(index: number) {
 async function generateAudioForSlide(index: number) {
   const slide = slides.value[index]
   if (!slide.narration) return
+  if (!projectStore.project?.id) return
 
   try {
     const result = await window.electronAPI.generateAudio({
+      projectId: projectStore.project.id,
       text: slide.narration,
       provider: voiceProvider.value,
       voiceName: voiceName.value,

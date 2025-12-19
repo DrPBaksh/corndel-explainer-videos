@@ -49,6 +49,7 @@ export interface ElectronAPI {
   // TTS
   generateOpenaiTts: (text: string, voice: string, outputPath: string) => Promise<{ success: boolean; data?: { audioPath: string; duration: number }; error?: string; cost?: number }>
   generateElevenlabsTts: (text: string, voiceId: string, outputPath: string) => Promise<{ success: boolean; data?: { audioPath: string; duration: number }; error?: string; cost?: number }>
+  generateAudio: (params: { projectId: string; text: string; provider: string; voiceName: string; slideNum: number }) => Promise<{ success: boolean; data?: { path: string; duration: number }; error?: string; cost?: number }>
 
   // Video Assembly
   assembleVideo: (slides: SlideVideo[], outputPath: string, options: VideoOptions) => Promise<{ success: boolean; data?: string; error?: string }>

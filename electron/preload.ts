@@ -103,6 +103,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   generateElevenlabsTts: (text: string, voiceId: string, outputPath: string): Promise<{ success: boolean; data?: { audioPath: string; duration: number }; error?: string; cost?: number }> =>
     ipcRenderer.invoke('generate-elevenlabs-tts', text, voiceId, outputPath),
 
+  generateAudio: (params: { projectId: string; text: string; provider: string; voiceName: string; slideNum: number }): Promise<{ success: boolean; data?: { path: string; duration: number }; error?: string; cost?: number }> =>
+    ipcRenderer.invoke('generate-audio', params),
+
   // ============================================
   // VIDEO ASSEMBLY
   // ============================================

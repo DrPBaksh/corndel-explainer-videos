@@ -1116,6 +1116,110 @@ async function getAudioDuration(audioPath: string): Promise<number> {
 }
 
 // ============================================
+// UNIFIED AUDIO GENERATION
+// ============================================
+
+interface AudioGenerationParams {
+  projectId: string
+  text: string
+  provider: string
+  voiceName: string
+  slideNum: number
+}
+
+ipcMain.handle('generate-audio', async (_event, params: AudioGenerationParams): Promise<{ success: boolean; data?: { path: string; duration: number }; error?: string; cost?: number }> => {
+  const { projectId, text, provider, voiceName, slideNum } = params
+
+  if (!text || !text.trim()) {
+    return { success: false, error: 'No text provided for audio generation' }
+  }
+
+  // Determine output path
+  const projectDir = join(app.getPath('userData'), 'projects', projectId)
+  const audioDir = join(projectDir, 'audio')
+  mkdirSync(audioDir, { recursive: true })
+  const outputPath = join(audioDir, `slide-${slideNum}.mp3`)
+
+  try {
+    if (provider === 'openai') {
+      const apiKey = apiKeyStore.get('openai') as string
+      if (!apiKey) {
+        return { success: false, error: 'OpenAI API key not configured' }
+      }
+
+      const OpenAI = (await import('openai')).default
+      const openai = new OpenAI({ apiKey })
+
+      const response = await openai.audio.speech.create({
+        model: 'tts-1-hd',
+        voice: voiceName as any,
+        input: text,
+        speed: 0.83
+      })
+
+      const buffer = Buffer.from(await response.arrayBuffer())
+      writeFileSync(outputPath, buffer)
+
+      const duration = await getAudioDuration(outputPath)
+      const cost = (text.length / 1_000_000) * 15
+
+      return {
+        success: true,
+        data: { path: outputPath, duration },
+        cost
+      }
+    } else if (provider === 'elevenlabs') {
+      const apiKey = apiKeyStore.get('elevenlabs') as string
+      if (!apiKey) {
+        return { success: false, error: 'ElevenLabs API key not configured' }
+      }
+
+      const response = await fetch(
+        `https://api.elevenlabs.io/v1/text-to-speech/${voiceName}`,
+        {
+          method: 'POST',
+          headers: {
+            'Accept': 'audio/mpeg',
+            'Content-Type': 'application/json',
+            'xi-api-key': apiKey
+          },
+          body: JSON.stringify({
+            text,
+            model_id: 'eleven_multilingual_v2',
+            voice_settings: {
+              stability: 0.5,
+              similarity_boost: 0.75
+            }
+          })
+        }
+      )
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        return { success: false, error: `ElevenLabs error: ${errorText}` }
+      }
+
+      const buffer = Buffer.from(await response.arrayBuffer())
+      writeFileSync(outputPath, buffer)
+
+      const duration = await getAudioDuration(outputPath)
+      const cost = (text.length / 1000) * 0.30
+
+      return {
+        success: true,
+        data: { path: outputPath, duration },
+        cost
+      }
+    } else {
+      return { success: false, error: `Unknown provider: ${provider}` }
+    }
+  } catch (e: any) {
+    console.error('Audio generation error:', e)
+    return { success: false, error: e.message }
+  }
+})
+
+// ============================================
 // VIDEO ASSEMBLY (FFmpeg)
 // ============================================
 
