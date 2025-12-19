@@ -65,6 +65,7 @@ export interface ElectronAPI {
   selectOutputFolder: () => Promise<string | null>
   selectImage: () => Promise<{ success: boolean; data?: string; error?: string }>
   showInFolder: (filePath: string) => Promise<void>
+  saveVideoAs: (sourcePath: string, projectName: string) => Promise<{ success: boolean; data?: string; error?: string }>
 
   // Template
   getTemplateParams: () => Promise<TemplateParams>

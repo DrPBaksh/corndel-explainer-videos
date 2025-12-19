@@ -86,33 +86,66 @@
           <div
             v-for="project in projects"
             :key="project.id"
-            class="card-hover p-4 flex items-center justify-between"
-            @click="openProject(project.id)"
+            class="card p-4"
           >
-            <div class="flex items-center gap-4">
-              <div class="w-10 h-10 bg-primary-100 rounded-lg flex items-center justify-center">
-                <svg class="w-5 h-5 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                </svg>
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-4 cursor-pointer flex-1" @click="openProject(project.id)">
+                <div
+                  class="w-10 h-10 rounded-lg flex items-center justify-center"
+                  :class="project.status === 'complete' ? 'bg-green-100' : 'bg-primary-100'"
+                >
+                  <svg v-if="project.status === 'complete'" class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                  </svg>
+                  <svg v-else class="w-5 h-5 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 class="font-medium text-gray-900">{{ project.name }}</h3>
+                  <p class="text-sm text-gray-500">
+                    {{ formatDate(project.updatedAt) }}
+                    <span :class="getStatusClass(project.status)">{{ formatStatus(project.status) }}</span>
+                  </p>
+                </div>
               </div>
-              <div>
-                <h3 class="font-medium text-gray-900">{{ project.name }}</h3>
-                <p class="text-sm text-gray-500">
-                  {{ formatDate(project.updatedAt) }}
-                  <span :class="getStatusClass(project.status)">{{ formatStatus(project.status) }}</span>
-                </p>
+              <div class="flex items-center gap-2">
+                <span class="text-sm text-gray-500">${{ project.totalCost.toFixed(2) }}</span>
+                <button
+                  @click.stop="deleteProject(project.id)"
+                  class="p-1.5 text-gray-400 hover:text-red-500 transition-colors"
+                  title="Delete project"
+                >
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                </button>
               </div>
             </div>
-            <div class="flex items-center gap-2">
-              <span class="text-sm text-gray-500">${{ project.totalCost.toFixed(2) }}</span>
+
+            <!-- Video actions for completed projects -->
+            <div v-if="project.status === 'complete' && project.videoPath" class="mt-3 pt-3 border-t border-gray-100 flex items-center gap-2">
               <button
-                @click.stop="deleteProject(project.id)"
-                class="p-1.5 text-gray-400 hover:text-red-500 transition-colors"
+                @click.stop="openVideoFolder(project.videoPath!)"
+                class="btn-secondary text-xs py-1 px-3 flex items-center gap-1"
               >
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
                 </svg>
+                Open Folder
               </button>
+              <button
+                @click.stop="saveVideoAs(project)"
+                class="btn-secondary text-xs py-1 px-3 flex items-center gap-1"
+              >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                </svg>
+                Save As
+              </button>
+              <span class="text-xs text-gray-400 ml-auto">
+                {{ getVideoFileName(project.videoPath!) }}
+              </span>
             </div>
           </div>
         </div>
@@ -162,6 +195,25 @@ async function deleteProject(projectId: string) {
     await window.electronAPI.deleteProject(projectId)
     projects.value = projects.value.filter(p => p.id !== projectId)
   }
+}
+
+async function openVideoFolder(videoPath: string) {
+  await window.electronAPI.showInFolder(videoPath)
+}
+
+async function saveVideoAs(project: Project) {
+  if (!project.videoPath) return
+
+  const result = await window.electronAPI.saveVideoAs(project.videoPath, project.name)
+  if (result.success) {
+    alert(`Video saved to: ${result.data}`)
+  } else if (result.error) {
+    alert(`Failed to save: ${result.error}`)
+  }
+}
+
+function getVideoFileName(videoPath: string): string {
+  return videoPath.split('/').pop() || videoPath.split('\\').pop() || 'video.mp4'
 }
 
 function formatDate(dateStr: string): string {

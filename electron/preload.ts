@@ -137,6 +137,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   showInFolder: (filePath: string): Promise<void> =>
     ipcRenderer.invoke('show-in-folder', filePath),
 
+  saveVideoAs: (sourcePath: string, projectName: string): Promise<{ success: boolean; data?: string; error?: string }> =>
+    ipcRenderer.invoke('save-video-as', sourcePath, projectName),
+
   // ============================================
   // TEMPLATE
   // ============================================

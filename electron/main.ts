@@ -1632,6 +1632,34 @@ ipcMain.handle('show-in-folder', async (_event, filePath: string): Promise<void>
   shell.showItemInFolder(filePath)
 })
 
+ipcMain.handle('save-video-as', async (_event, sourcePath: string, projectName: string): Promise<{ success: boolean; data?: string; error?: string }> => {
+  if (!mainWindow) return { success: false, error: 'No window' }
+
+  // Sanitize project name for filename
+  const safeName = projectName.replace(/[^a-z0-9]/gi, '_')
+  const defaultName = `${safeName}.mp4`
+
+  const result = await dialog.showSaveDialog(mainWindow, {
+    title: 'Save Video As',
+    defaultPath: defaultName,
+    filters: [{ name: 'Video Files', extensions: ['mp4'] }]
+  })
+
+  if (result.canceled || !result.filePath) {
+    return { success: false }
+  }
+
+  try {
+    // Copy the video file to the chosen location
+    const { copyFileSync } = require('fs')
+    copyFileSync(sourcePath, result.filePath)
+    return { success: true, data: result.filePath }
+  } catch (e: any) {
+    console.error('Error saving video:', e)
+    return { success: false, error: e.message }
+  }
+})
+
 // ============================================
 // TEMPLATE
 // ============================================
