@@ -305,6 +305,9 @@ async function generateAudioForSlide(index: number): Promise<boolean> {
         audioPath: result.data.path,
         audioDuration: result.data.duration
       })
+      // Save immediately after each audio generation so progress isn't lost
+      await projectStore.saveProject()
+      console.log(`Audio for slide ${index + 1} saved to project`)
       return true
     } else {
       errorMessage.value = result.error || 'Failed to generate audio'
