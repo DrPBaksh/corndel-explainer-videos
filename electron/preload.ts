@@ -107,8 +107,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('generate-audio', params),
 
   // ============================================
-  // VIDEO ASSEMBLY
+  // VIDEO GENERATION
   // ============================================
+  generateVideo: (projectId: string): Promise<{ success: boolean; data?: { path: string; duration: number }; error?: string }> =>
+    ipcRenderer.invoke('generate-video', projectId),
+
+  // Legacy - VIDEO ASSEMBLY
   assembleVideo: (slides: SlideVideo[], outputPath: string, options: VideoOptions): Promise<{ success: boolean; data?: string; error?: string }> =>
     ipcRenderer.invoke('assemble-video', slides, outputPath, options),
 

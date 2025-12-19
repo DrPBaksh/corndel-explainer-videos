@@ -1220,7 +1220,194 @@ ipcMain.handle('generate-audio', async (_event, params: AudioGenerationParams): 
 })
 
 // ============================================
-// VIDEO ASSEMBLY (FFmpeg)
+// VIDEO GENERATION (Simplified - takes projectId)
+// ============================================
+
+ipcMain.handle('generate-video', async (_event, projectId: string): Promise<{ success: boolean; data?: { path: string; duration: number }; error?: string }> => {
+  try {
+    console.log('=== generate-video called ===')
+    console.log('Project ID:', projectId)
+
+    // Load project
+    const projectDir = join(app.getPath('userData'), 'projects', projectId)
+    const projectPath = join(projectDir, 'project.json')
+
+    if (!existsSync(projectPath)) {
+      return { success: false, error: 'Project not found' }
+    }
+
+    const project: Project = JSON.parse(readFileSync(projectPath, 'utf-8'))
+    console.log('Project loaded, slides:', project.slides.length)
+
+    // Verify all slides have audio
+    const slidesWithAudio = project.slides.filter(s => s.audioPath && existsSync(s.audioPath))
+    if (slidesWithAudio.length !== project.slides.length) {
+      return { success: false, error: `Only ${slidesWithAudio.length} of ${project.slides.length} slides have audio` }
+    }
+
+    const ffmpeg = require('fluent-ffmpeg')
+    const ffmpegStatic = require('ffmpeg-static')
+    const ffprobeStatic = require('ffprobe-static')
+
+    ffmpeg.setFfmpegPath(ffmpegStatic)
+    ffmpeg.setFfprobePath(ffprobeStatic.path)
+
+    const tempDir = join(app.getPath('temp'), `video_${Date.now()}`)
+    mkdirSync(tempDir, { recursive: true })
+
+    const slideVideos: string[] = []
+    const width = 1920
+    const height = 1080
+
+    // Create individual slide videos
+    for (let i = 0; i < project.slides.length; i++) {
+      const slide = project.slides[i]
+      console.log(`Processing slide ${i + 1}/${project.slides.length}`)
+
+      // Send progress
+      mainWindow?.webContents.send('progress-update', {
+        type: 'video',
+        progress: (i / project.slides.length) * 80,
+        message: `Processing slide ${i + 1} of ${project.slides.length}`,
+        slideIndex: i
+      })
+
+      const slideVideoPath = join(tempDir, `slide_${i.toString().padStart(3, '0')}.mp4`)
+
+      // Determine the image source for this slide
+      let imageInput: string
+      let inputOptions: string[] = ['-loop', '1']
+
+      // Check for visual image first
+      const visualPath = slide.visualData?.imagePath
+      if (visualPath && existsSync(visualPath)) {
+        imageInput = visualPath
+        console.log(`  Using visual image: ${visualPath}`)
+      } else if (slide.backgroundType === 'image' && slide.backgroundImagePath && existsSync(slide.backgroundImagePath)) {
+        imageInput = slide.backgroundImagePath
+        console.log(`  Using background image: ${slide.backgroundImagePath}`)
+      } else {
+        // Create a solid color image using ffmpeg
+        const bgColor = slide.backgroundColor || '#1a1a2e'
+        imageInput = `color=c=${bgColor.replace('#', '')}:s=${width}x${height}:d=1`
+        inputOptions = ['-f', 'lavfi']
+        console.log(`  Using solid color: ${bgColor}`)
+      }
+
+      const duration = slide.audioDuration || slide.duration || 5
+
+      await new Promise<void>((resolve, reject) => {
+        const cmd = ffmpeg()
+          .input(imageInput)
+          .inputOptions(inputOptions)
+          .input(slide.audioPath!)
+          .outputOptions([
+            '-c:v', 'libx264',
+            '-tune', 'stillimage',
+            '-c:a', 'aac',
+            '-b:a', '192k',
+            '-pix_fmt', 'yuv420p',
+            '-shortest',
+            '-t', duration.toString(),
+            '-vf', `scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2`
+          ])
+          .output(slideVideoPath)
+          .on('end', () => {
+            console.log(`  Slide ${i + 1} video created`)
+            resolve()
+          })
+          .on('error', (err: Error) => {
+            console.error(`  Error creating slide ${i + 1}:`, err)
+            reject(err)
+          })
+
+        cmd.run()
+      })
+
+      slideVideos.push(slideVideoPath)
+    }
+
+    // Create concat list
+    const concatListPath = join(tempDir, 'concat_list.txt')
+    const concatList = slideVideos.map(p => `file '${p.replace(/\\/g, '/')}'`).join('\n')
+    writeFileSync(concatListPath, concatList)
+    console.log('Concat list created')
+
+    // Final output path
+    const outputPath = join(projectDir, 'video', `${project.name.replace(/[^a-z0-9]/gi, '_')}_${Date.now()}.mp4`)
+    mkdirSync(join(projectDir, 'video'), { recursive: true })
+
+    // Send progress
+    mainWindow?.webContents.send('progress-update', {
+      type: 'video',
+      progress: 85,
+      message: 'Assembling final video...'
+    })
+
+    // Concatenate videos
+    await new Promise<void>((resolve, reject) => {
+      ffmpeg()
+        .input(concatListPath)
+        .inputOptions(['-f', 'concat', '-safe', '0'])
+        .outputOptions([
+          '-c:v', 'libx264',
+          '-preset', 'medium',
+          '-crf', '23',
+          '-c:a', 'aac',
+          '-b:a', '192k'
+        ])
+        .output(outputPath)
+        .on('progress', (progress: any) => {
+          mainWindow?.webContents.send('progress-update', {
+            type: 'video',
+            progress: 85 + (progress.percent || 0) * 0.15,
+            message: 'Finalizing video...'
+          })
+        })
+        .on('end', () => {
+          console.log('Final video created:', outputPath)
+          resolve()
+        })
+        .on('error', (err: Error) => {
+          console.error('Error concatenating:', err)
+          reject(err)
+        })
+        .run()
+    })
+
+    // Calculate total duration
+    const totalDuration = project.slides.reduce((sum, s) => sum + (s.audioDuration || s.duration || 5), 0)
+
+    // Update project with video path
+    project.videoPath = outputPath
+    project.status = 'complete'
+    writeFileSync(projectPath, JSON.stringify(project, null, 2))
+
+    // Clean up temp files
+    try {
+      rmSync(tempDir, { recursive: true })
+    } catch (e) {
+      console.warn('Could not clean temp dir:', e)
+    }
+
+    mainWindow?.webContents.send('progress-update', {
+      type: 'video',
+      progress: 100,
+      message: 'Complete!'
+    })
+
+    return {
+      success: true,
+      data: { path: outputPath, duration: totalDuration }
+    }
+  } catch (e: any) {
+    console.error('Video generation error:', e)
+    return { success: false, error: e.message }
+  }
+})
+
+// ============================================
+// VIDEO ASSEMBLY (FFmpeg) - Legacy
 // ============================================
 
 ipcMain.handle('assemble-video', async (event, slides: SlideVideo[], outputPath: string, options: VideoOptions): Promise<{ success: boolean; data?: string; error?: string }> => {

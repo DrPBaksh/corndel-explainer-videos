@@ -59,17 +59,32 @@
 
             <div class="flex items-center justify-between">
               <div class="text-sm text-gray-600">
-                <p><strong>Duration:</strong> {{ videoDuration }}s</p>
+                <p><strong>Duration:</strong> {{ Math.round(videoDuration) }}s</p>
                 <p><strong>Resolution:</strong> 1920x1080</p>
               </div>
               <div class="flex gap-2">
-                <button @click="openVideoFolder" class="btn-secondary">
+                <button @click="openVideoFolder" class="btn-primary">
                   Open Folder
                 </button>
-                <button @click="exportVideo" class="btn-primary">
-                  Export Video
-                </button>
               </div>
+            </div>
+          </div>
+
+          <!-- Error Message -->
+          <div v-if="errorMessage" class="bg-red-50 border border-red-200 rounded-lg p-4 mt-4">
+            <div class="flex items-start gap-3">
+              <svg class="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <div class="flex-1">
+                <p class="text-sm font-medium text-red-800">Video Generation Error</p>
+                <p class="text-sm text-red-600 mt-1">{{ errorMessage }}</p>
+              </div>
+              <button @click="errorMessage = null" class="text-red-400 hover:text-red-600">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
             </div>
           </div>
 
@@ -175,6 +190,7 @@ const currentSlideIndex = ref(-1)
 const generatedSlides = ref<number[]>([])
 const videoPath = ref<string | null>(null)
 const videoDuration = ref(0)
+const errorMessage = ref<string | null>(null)
 
 onMounted(async () => {
   const projectId = route.params.id as string
@@ -240,28 +256,30 @@ function getSlideBackgroundStyle(slide: Slide): Record<string, string> {
 async function generateVideo() {
   if (!projectStore.project || !canGenerate.value) return
 
+  console.log('=== generateVideo called ===')
   isGenerating.value = true
   progress.value = 0
   progressText.value = 'Preparing slides...'
   generatedSlides.value = []
   currentSlideIndex.value = 0
+  errorMessage.value = null
 
   try {
-    const result = await window.electronAPI.assembleVideo(projectStore.project.id)
+    const result = await window.electronAPI.generateVideo(projectStore.project.id)
+    console.log('generateVideo result:', result)
 
     if (result.success && result.data) {
       videoPath.value = result.data.path
       videoDuration.value = result.data.duration
 
-      // Update project
-      projectStore.updateProject({
-        outputPath: result.data.path,
-        status: 'complete'
-      })
-      await projectStore.saveProject()
+      // Reload project to get updated status
+      await projectStore.loadProject(projectStore.project.id)
+    } else {
+      errorMessage.value = result.error || 'Video generation failed'
     }
-  } catch (error) {
+  } catch (error: any) {
     console.error('Video generation failed:', error)
+    errorMessage.value = error.message || 'Video generation failed'
   } finally {
     isGenerating.value = false
     currentSlideIndex.value = -1
@@ -270,16 +288,7 @@ async function generateVideo() {
 
 async function openVideoFolder() {
   if (videoPath.value) {
-    await window.electronAPI.openFolder(videoPath.value)
-  }
-}
-
-async function exportVideo() {
-  if (videoPath.value) {
-    const result = await window.electronAPI.exportVideo(videoPath.value)
-    if (result.success) {
-      alert('Video exported successfully!')
-    }
+    await window.electronAPI.showInFolder(videoPath.value)
   }
 }
 </script>
