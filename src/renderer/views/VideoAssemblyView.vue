@@ -218,8 +218,8 @@ onMounted(async () => {
   }
 
   // Check if video already exists
-  if (projectStore.project?.outputPath) {
-    videoPath.value = projectStore.project.outputPath
+  if (projectStore.project?.videoPath) {
+    videoPath.value = projectStore.project.videoPath
     videoDuration.value = projectStore.project.contentStrategy?.totalDuration || 0
   }
 
