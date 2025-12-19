@@ -186,16 +186,26 @@ const voiceName = ref('nova')
 const errorMessage = ref<string | null>(null)
 
 onMounted(async () => {
+  console.log('=== AudioGenerationView mounted ===')
   const projectId = route.params.id as string
+  console.log('Project ID from route:', projectId)
+
   if (!projectStore.project || projectStore.project.id !== projectId) {
+    console.log('Loading project...')
     await projectStore.loadProject(projectId)
   }
 
+  console.log('Project loaded:', projectStore.project?.id)
+  console.log('Number of slides:', projectStore.project?.slides?.length)
+
   // Use project voice settings
   if (projectStore.project?.config) {
-    voiceProvider.value = projectStore.project.config.voiceProvider
-    voiceName.value = projectStore.project.config.voiceName
+    voiceProvider.value = projectStore.project.config.voiceProvider || 'openai'
+    voiceName.value = projectStore.project.config.voiceName || 'nova'
   }
+
+  console.log('Voice provider:', voiceProvider.value)
+  console.log('Voice name:', voiceName.value)
 })
 
 const slides = computed(() => projectStore.project?.slides || [])
@@ -221,6 +231,23 @@ const progressText = computed(() => {
 })
 
 async function generateAllAudio() {
+  console.log('=== generateAllAudio called ===')
+  console.log('Number of slides:', slides.value.length)
+  console.log('Slides:', slides.value.map(s => ({ slideNum: s.slideNum, narration: s.narration?.substring(0, 50), audioPath: s.audioPath })))
+
+  if (slides.value.length === 0) {
+    errorMessage.value = 'No slides found in project'
+    return
+  }
+
+  const slidesWithNarration = slides.value.filter(s => s.narration && !s.audioPath)
+  console.log('Slides needing audio:', slidesWithNarration.length)
+
+  if (slidesWithNarration.length === 0) {
+    errorMessage.value = 'No slides need audio generation (either no narration or already generated)'
+    return
+  }
+
   isGenerating.value = true
   errorMessage.value = null
 
