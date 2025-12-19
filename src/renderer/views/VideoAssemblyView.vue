@@ -189,7 +189,7 @@ onMounted(async () => {
   }
 
   // Listen for progress updates
-  window.electronAPI.onProgress((data) => {
+  window.electronAPI.onProgressUpdate((data) => {
     if (data.type === 'video') {
       progress.value = data.progress
       progressText.value = data.message || ''
