@@ -73,30 +73,13 @@
         </div>
       </div>
 
-      <!-- Layout selector -->
-      <div>
-        <label class="label">Layout</label>
-        <div class="grid grid-cols-3 gap-2">
-          <button
-            v-for="layout in layouts"
-            :key="layout.value"
-            @click="setLayout(layout.value)"
-            class="p-2 border rounded-lg text-xs text-center transition-colors"
-            :class="slide.layout === layout.value
-              ? 'border-primary-500 bg-primary-50 text-primary-700'
-              : 'border-gray-200 hover:border-gray-300'"
-          >
-            {{ layout.label }}
-          </button>
-        </div>
-      </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, watch } from 'vue'
-import type { Slide, LayoutType } from '@shared/types'
+import type { Slide } from '@shared/types'
 
 const props = defineProps<{
   slide: Slide | null
@@ -115,15 +98,6 @@ const localHeadline = ref('')
 const localSubheadline = ref('')
 const localBodyText = ref('')
 const localBullets = ref<string[]>([])
-
-const layouts: { value: LayoutType; label: string }[] = [
-  { value: 'title-center', label: 'Title Center' },
-  { value: 'title-left', label: 'Title Left' },
-  { value: 'split-left', label: 'Split Left' },
-  { value: 'split-right', label: 'Split Right' },
-  { value: 'full-image', label: 'Full Image' },
-  { value: 'bullets-left', label: 'Bullets Left' }
-]
 
 // Debounce timer
 let debounceTimer: ReturnType<typeof setTimeout> | null = null
@@ -163,12 +137,5 @@ function addBullet() {
 function removeBullet(index: number) {
   localBullets.value.splice(index, 1)
   emitUpdate()
-}
-
-function setLayout(layout: LayoutType) {
-  if (props.slide) {
-    // This would need to go through the store
-    // For now, just emit an update
-  }
 }
 </script>
