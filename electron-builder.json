@@ -1,0 +1,43 @@
+{
+  "$schema": "https://raw.githubusercontent.com/electron-userland/electron-builder/master/packages/app-builder-lib/scheme.json",
+  "appId": "com.corndel.explainer-videos",
+  "productName": "Corndel Explainer Videos",
+  "directories": {
+    "output": "release"
+  },
+  "files": [
+    "dist/**/*",
+    "dist-electron/**/*"
+  ],
+  "asarUnpack": [
+    "**/node_modules/ffmpeg-static/**/*",
+    "**/node_modules/ffprobe-static/**/*",
+    "**/public/reference-images/**/*"
+  ],
+  "extraResources": [
+    {
+      "from": "public/reference-images",
+      "to": "reference-images"
+    },
+    {
+      "from": "templates",
+      "to": "templates"
+    }
+  ],
+  "win": {
+    "target": "nsis",
+    "icon": "public/favicon.ico"
+  },
+  "mac": {
+    "target": "dmg",
+    "icon": "public/favicon.icns"
+  },
+  "linux": {
+    "target": "AppImage",
+    "icon": "public/favicon.png"
+  },
+  "nsis": {
+    "oneClick": false,
+    "allowToChangeInstallationDirectory": true
+  }
+}
