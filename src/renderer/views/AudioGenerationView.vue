@@ -88,6 +88,24 @@
           <p class="text-sm text-gray-600 text-center">{{ progressText }}</p>
         </div>
 
+        <!-- Error Message -->
+        <div v-if="errorMessage" class="bg-red-50 border border-red-200 rounded-lg p-4">
+          <div class="flex items-start gap-3">
+            <svg class="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <div class="flex-1">
+              <p class="text-sm font-medium text-red-800">Audio Generation Error</p>
+              <p class="text-sm text-red-600 mt-1">{{ errorMessage }}</p>
+            </div>
+            <button @click="errorMessage = null" class="text-red-400 hover:text-red-600">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        </div>
+
         <!-- Slide List -->
         <div class="space-y-4">
           <div
@@ -165,6 +183,7 @@ const isGenerating = ref(false)
 const currentGeneratingIndex = ref(-1)
 const voiceProvider = ref('openai')
 const voiceName = ref('nova')
+const errorMessage = ref<string | null>(null)
 
 onMounted(async () => {
   const projectId = route.params.id as string
@@ -203,12 +222,14 @@ const progressText = computed(() => {
 
 async function generateAllAudio() {
   isGenerating.value = true
+  errorMessage.value = null
 
   for (let i = 0; i < slides.value.length; i++) {
     const slide = slides.value[i]
     if (!slide.audioPath && slide.narration) {
       currentGeneratingIndex.value = i
-      await generateAudioForSlide(i)
+      const success = await generateAudioForSlide(i)
+      if (!success) break
     }
   }
 
@@ -219,6 +240,7 @@ async function generateAllAudio() {
 
 async function generateSingleAudio(index: number) {
   isGenerating.value = true
+  errorMessage.value = null
   currentGeneratingIndex.value = index
 
   await generateAudioForSlide(index)
@@ -228,12 +250,19 @@ async function generateSingleAudio(index: number) {
   await projectStore.saveProject()
 }
 
-async function generateAudioForSlide(index: number) {
+async function generateAudioForSlide(index: number): Promise<boolean> {
   const slide = slides.value[index]
-  if (!slide.narration) return
-  if (!projectStore.project?.id) return
+  if (!slide.narration) {
+    errorMessage.value = `Slide ${index + 1} has no narration text`
+    return false
+  }
+  if (!projectStore.project?.id) {
+    errorMessage.value = 'No project loaded'
+    return false
+  }
 
   try {
+    console.log('Generating audio for slide', index + 1, 'with provider:', voiceProvider.value)
     const result = await window.electronAPI.generateAudio({
       projectId: projectStore.project.id,
       text: slide.narration,
@@ -242,14 +271,22 @@ async function generateAudioForSlide(index: number) {
       slideNum: slide.slideNum
     })
 
+    console.log('Audio generation result:', result)
+
     if (result.success && result.data) {
       projectStore.updateSlide(slide.slideNum, {
         audioPath: result.data.path,
         audioDuration: result.data.duration
       })
+      return true
+    } else {
+      errorMessage.value = result.error || 'Failed to generate audio'
+      return false
     }
-  } catch (error) {
+  } catch (error: any) {
     console.error(`Failed to generate audio for slide ${index + 1}:`, error)
+    errorMessage.value = error.message || 'An error occurred'
+    return false
   }
 }
 
