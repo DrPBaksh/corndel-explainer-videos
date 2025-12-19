@@ -80,15 +80,6 @@
         </div>
 
         <div class="flex items-center gap-2">
-          <select v-model="activePanel" class="input text-sm py-1">
-            <option value="text">Text</option>
-            <option value="visual">Visual</option>
-            <option value="background">Background</option>
-            <option value="narration">Narration</option>
-          </select>
-        </div>
-
-        <div class="flex items-center gap-2">
           <button
             v-if="slidesStore.activeSlide?.status !== 'complete'"
             @click="slidesStore.markComplete"
@@ -122,8 +113,24 @@
     </div>
 
     <!-- Right sidebar: Property panels -->
-    <div class="w-80 bg-white border-l border-gray-200 overflow-y-auto">
-      <div class="p-4">
+    <div class="w-80 bg-white border-l border-gray-200 flex flex-col">
+      <!-- Panel Tabs -->
+      <div class="flex border-b border-gray-200 bg-gray-50">
+        <button
+          v-for="tab in panelTabs"
+          :key="tab.value"
+          @click="activePanel = tab.value"
+          class="flex-1 px-2 py-2 text-xs font-medium transition-colors"
+          :class="activePanel === tab.value
+            ? 'text-primary-600 border-b-2 border-primary-500 bg-white'
+            : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'"
+        >
+          {{ tab.label }}
+        </button>
+      </div>
+
+      <!-- Panel Content -->
+      <div class="flex-1 overflow-y-auto p-4">
         <!-- Text Panel -->
         <TextPanel
           v-if="activePanel === 'text'"
@@ -197,6 +204,13 @@ const slidesStore = useSlidesStore()
 
 const activePanel = ref<'text' | 'visual' | 'background' | 'narration'>('text')
 const saving = ref(false)
+
+const panelTabs = [
+  { value: 'text' as const, label: 'Text' },
+  { value: 'visual' as const, label: 'Visual' },
+  { value: 'background' as const, label: 'Background' },
+  { value: 'narration' as const, label: 'Narration' }
+]
 
 onMounted(async () => {
   const projectId = route.params.id as string
