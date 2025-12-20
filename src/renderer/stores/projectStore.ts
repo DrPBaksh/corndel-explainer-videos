@@ -350,6 +350,155 @@ export const useProjectStore = defineStore('project', () => {
     error.value = null
   }
 
+  async function regenerateSlide(
+    slideNum: number,
+    customInstructions: string,
+    regenerateFields: {
+      layout: boolean
+      headline: boolean
+      subheadline: boolean
+      bodyText: boolean
+      bullets: boolean
+      visualSuggestions: boolean
+      narration: boolean
+    },
+    preserve: {
+      visual: boolean
+      audio: boolean
+      positions: boolean
+      background: boolean
+    }
+  ): Promise<{ success: boolean; error?: string }> {
+    if (!project.value) return { success: false, error: 'No project loaded' }
+
+    const slideIndex = project.value.slides.findIndex(s => s.slideNum === slideNum)
+    if (slideIndex < 0) return { success: false, error: 'Slide not found' }
+
+    const existingSlide = project.value.slides[slideIndex]
+
+    try {
+      const result = await window.electronAPI.regenerateSlide({
+        projectId: project.value.id,
+        slideNum,
+        customInstructions,
+        regenerateFields
+      })
+
+      if (!result.success || !result.data) {
+        return { success: false, error: result.error || 'Regeneration failed' }
+      }
+
+      const regenerated = result.data
+
+      // Build updated slide by merging regenerated fields
+      const updatedSlide: Slide = { ...existingSlide }
+
+      // Apply regenerated fields
+      if (regenerateFields.layout && regenerated.layout) {
+        updatedSlide.layout = regenerated.layout as LayoutType
+        // If not preserving positions, recreate elements based on new layout
+        if (!preserve.positions) {
+          const mockStrategy = {
+            slideNum,
+            headline: regenerated.headline ?? existingSlide.headline,
+            subheadline: regenerated.subheadline ?? existingSlide.subheadline,
+            bodyText: regenerated.bodyText ?? existingSlide.bodyText,
+            bullets: regenerated.bullets ?? existingSlide.bullets,
+            visualType: regenerated.visualType ?? existingSlide.visualType,
+            layout: regenerated.layout as LayoutType,
+            narration: regenerated.narration ?? existingSlide.narration
+          } as SlideStrategy
+          updatedSlide.elements = createDefaultElements(mockStrategy)
+        }
+      }
+
+      if (regenerateFields.headline && regenerated.headline !== undefined) {
+        updatedSlide.headline = regenerated.headline
+        // Update headline element content
+        const headlineEl = updatedSlide.elements.find(e => e.type === 'headline')
+        if (headlineEl) {
+          headlineEl.content = regenerated.headline
+        }
+      }
+
+      if (regenerateFields.subheadline && regenerated.subheadline !== undefined) {
+        updatedSlide.subheadline = regenerated.subheadline
+        const subheadlineEl = updatedSlide.elements.find(e => e.type === 'subheadline')
+        if (subheadlineEl) {
+          subheadlineEl.content = regenerated.subheadline
+        }
+      }
+
+      if (regenerateFields.bodyText && regenerated.bodyText !== undefined) {
+        updatedSlide.bodyText = regenerated.bodyText
+        const bodyEl = updatedSlide.elements.find(e => e.type === 'body')
+        if (bodyEl) {
+          bodyEl.content = regenerated.bodyText
+        }
+      }
+
+      if (regenerateFields.bullets && regenerated.bullets !== undefined) {
+        updatedSlide.bullets = regenerated.bullets
+        const bulletsEl = updatedSlide.elements.find(e => e.type === 'bullets')
+        if (bulletsEl) {
+          bulletsEl.content = regenerated.bullets?.join('\n') || null
+        }
+      }
+
+      if (regenerateFields.visualSuggestions) {
+        if (regenerated.visualType) {
+          updatedSlide.visualType = regenerated.visualType as any
+        }
+        // Store visual suggestions in slide (for reference)
+        // Note: pexelsKeywords, geminiPrompt, diagramDescription are stored in strategy, not slide
+        // We could add these to metadata if needed
+      }
+
+      if (regenerateFields.narration && regenerated.narration !== undefined) {
+        updatedSlide.narration = regenerated.narration
+      }
+
+      // Handle preservation
+      if (!preserve.visual) {
+        updatedSlide.visualData = null
+        const imageEl = updatedSlide.elements.find(e => e.type === 'image')
+        if (imageEl) {
+          imageEl.imagePath = null
+        }
+      }
+
+      if (!preserve.audio) {
+        updatedSlide.audioPath = null
+        updatedSlide.audioDuration = null
+      }
+
+      if (!preserve.background) {
+        updatedSlide.backgroundType = 'solid'
+        updatedSlide.backgroundColor = '#ffffff'
+        updatedSlide.backgroundGradient = null
+        updatedSlide.backgroundImagePath = null
+      }
+
+      // Reset status to pending
+      updatedSlide.status = 'pending'
+
+      // Update the slide in the project
+      project.value.slides[slideIndex] = updatedSlide
+
+      // Track cost
+      if (result.cost) {
+        addCost('contentGeneration', result.cost)
+      }
+
+      // Save project
+      await saveProject()
+
+      return { success: true }
+    } catch (e: any) {
+      return { success: false, error: e.message }
+    }
+  }
+
   return {
     // State
     project,
@@ -372,6 +521,7 @@ export const useProjectStore = defineStore('project', () => {
     removeSlideElement,
     setStatus,
     addCost,
-    clearProject
+    clearProject,
+    regenerateSlide
   }
 })

@@ -64,6 +64,22 @@ contextBridge.exposeInMainWorld('electronAPI', {
   generateDiagramHtml: (description: string, colors: { primary: string; secondary: string; accent: string }): Promise<{ success: boolean; data?: string; error?: string; cost?: number }> =>
     ipcRenderer.invoke('generate-diagram-html', description, colors),
 
+  regenerateSlide: (params: {
+    projectId: string
+    slideNum: number
+    customInstructions: string
+    regenerateFields: {
+      layout: boolean
+      headline: boolean
+      subheadline: boolean
+      bodyText: boolean
+      bullets: boolean
+      visualSuggestions: boolean
+      narration: boolean
+    }
+  }): Promise<{ success: boolean; data?: any; error?: string; cost?: number }> =>
+    ipcRenderer.invoke('regenerate-slide', params),
+
   // ============================================
   // IMAGE GENERATION
   // ============================================

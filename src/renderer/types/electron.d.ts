@@ -33,6 +33,34 @@ export interface ElectronAPI {
   generateDiagram: (description: string) => Promise<{ success: boolean; data?: string; error?: string }>
   generateDiagramHtml: (description: string, colors: { primary: string; secondary: string; accent: string }) => Promise<{ success: boolean; data?: string; error?: string; cost?: number }>
 
+  // Slide Regeneration
+  regenerateSlide: (params: {
+    projectId: string
+    slideNum: number
+    customInstructions: string
+    regenerateFields: {
+      layout: boolean
+      headline: boolean
+      subheadline: boolean
+      bodyText: boolean
+      bullets: boolean
+      visualSuggestions: boolean
+      narration: boolean
+    }
+  }) => Promise<{ success: boolean; data?: {
+    layout?: string
+    headline?: string | null
+    subheadline?: string | null
+    bodyText?: string | null
+    bullets?: string[] | null
+    visualType?: string
+    visualDescription?: string | null
+    pexelsKeywords?: string | null
+    geminiPrompt?: string | null
+    diagramDescription?: string | null
+    narration?: string
+  }; error?: string; cost?: number }>
+
   // Image Generation
   generateImage: (prompt: string, model?: string) => Promise<{ success: boolean; data?: string; error?: string }>
   generateGenaiImage: (prompt: string, options: GenAIOptions, outputPath: string) => Promise<{ success: boolean; data?: { imagePath: string; imageBase64: string }; error?: string; cost?: number }>

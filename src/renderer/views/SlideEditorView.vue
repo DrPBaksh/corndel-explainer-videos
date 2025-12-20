@@ -158,6 +158,14 @@
           :slide="slidesStore.activeSlide"
           @update-narration="handleNarrationUpdate"
         />
+
+        <!-- AI Panel -->
+        <AIPanel
+          v-if="activePanel === 'ai'"
+          ref="aiPanelRef"
+          :slide="slidesStore.activeSlide"
+          @regenerate="handleRegenerate"
+        />
       </div>
     </div>
 
@@ -195,6 +203,7 @@ import TextPanel from '../components/panels/TextPanel.vue'
 import VisualPanel from '../components/panels/VisualPanel.vue'
 import BackgroundPanel from '../components/panels/BackgroundPanel.vue'
 import NarrationPanel from '../components/panels/NarrationPanel.vue'
+import AIPanel from '../components/panels/AIPanel.vue'
 import type { Slide, VisualData } from '@shared/types'
 
 const route = useRoute()
@@ -202,14 +211,16 @@ const router = useRouter()
 const projectStore = useProjectStore()
 const slidesStore = useSlidesStore()
 
-const activePanel = ref<'text' | 'visual' | 'background' | 'narration'>('text')
+const activePanel = ref<'text' | 'visual' | 'background' | 'narration' | 'ai'>('text')
 const saving = ref(false)
+const aiPanelRef = ref<InstanceType<typeof AIPanel> | null>(null)
 
 const panelTabs = [
   { value: 'text' as const, label: 'Text' },
   { value: 'visual' as const, label: 'Visual' },
   { value: 'background' as const, label: 'Background' },
-  { value: 'narration' as const, label: 'Narration' }
+  { value: 'narration' as const, label: 'Narration' },
+  { value: 'ai' as const, label: 'AI' }
 ]
 
 onMounted(async () => {
@@ -274,6 +285,47 @@ function handleBackgroundUpdate(type: 'solid' | 'gradient' | 'image', value: str
 
 function handleNarrationUpdate(narration: string) {
   slidesStore.updateNarration(narration)
+}
+
+async function handleRegenerate(params: {
+  customInstructions: string
+  regenerate: {
+    layout: boolean
+    headline: boolean
+    subheadline: boolean
+    bodyText: boolean
+    bullets: boolean
+    visualSuggestions: boolean
+    narration: boolean
+  }
+  preserve: {
+    visual: boolean
+    audio: boolean
+    positions: boolean
+    background: boolean
+  }
+}) {
+  if (!projectStore.project || !slidesStore.activeSlide) return
+
+  aiPanelRef.value?.setRegenerating(true)
+  aiPanelRef.value?.setError(null)
+
+  try {
+    const result = await projectStore.regenerateSlide(
+      slidesStore.activeSlide.slideNum,
+      params.customInstructions,
+      params.regenerate,
+      params.preserve
+    )
+
+    if (!result.success) {
+      aiPanelRef.value?.setError(result.error || 'Regeneration failed')
+    }
+  } catch (error: any) {
+    aiPanelRef.value?.setError(error.message || 'Regeneration failed')
+  } finally {
+    aiPanelRef.value?.setRegenerating(false)
+  }
 }
 
 async function saveSlide() {

@@ -416,6 +416,188 @@ SLIDES: ${config.numSlides === 'flexible' ? '5-7 (you decide)' : config.numSlide
 }
 
 // ============================================
+// SINGLE SLIDE REGENERATION
+// ============================================
+
+interface RegenerateSlideParams {
+  projectId: string
+  slideNum: number
+  customInstructions: string
+  regenerateFields: {
+    layout: boolean
+    headline: boolean
+    subheadline: boolean
+    bodyText: boolean
+    bullets: boolean
+    visualSuggestions: boolean
+    narration: boolean
+  }
+}
+
+interface RegeneratedSlideData {
+  layout?: string
+  headline?: string | null
+  subheadline?: string | null
+  bodyText?: string | null
+  bullets?: string[] | null
+  visualType?: string
+  visualDescription?: string | null
+  pexelsKeywords?: string | null
+  geminiPrompt?: string | null
+  diagramDescription?: string | null
+  narration?: string
+}
+
+ipcMain.handle('regenerate-slide', async (_event, params: RegenerateSlideParams): Promise<{ success: boolean; data?: RegeneratedSlideData; error?: string; cost?: number }> => {
+  const apiKey = apiKeyStore.get('openai') as string
+  if (!apiKey) {
+    return { success: false, error: 'OpenAI API key not configured' }
+  }
+
+  try {
+    // Load project
+    const projectDir = join(app.getPath('userData'), 'projects', params.projectId)
+    const projectPath = join(projectDir, 'project.json')
+
+    if (!existsSync(projectPath)) {
+      return { success: false, error: 'Project not found' }
+    }
+
+    const project: Project = JSON.parse(readFileSync(projectPath, 'utf-8'))
+    const currentSlide = project.slides.find(s => s.slideNum === params.slideNum)
+
+    if (!currentSlide) {
+      return { success: false, error: 'Slide not found' }
+    }
+
+    const prevSlide = project.slides.find(s => s.slideNum === params.slideNum - 1)
+    const nextSlide = project.slides.find(s => s.slideNum === params.slideNum + 1)
+
+    // Build list of fields to regenerate
+    const fieldsToRegenerate: string[] = []
+    if (params.regenerateFields.layout) fieldsToRegenerate.push('layout')
+    if (params.regenerateFields.headline) fieldsToRegenerate.push('headline')
+    if (params.regenerateFields.subheadline) fieldsToRegenerate.push('subheadline')
+    if (params.regenerateFields.bodyText) fieldsToRegenerate.push('bodyText')
+    if (params.regenerateFields.bullets) fieldsToRegenerate.push('bullets')
+    if (params.regenerateFields.visualSuggestions) {
+      fieldsToRegenerate.push('visualType', 'visualDescription', 'pexelsKeywords', 'geminiPrompt', 'diagramDescription')
+    }
+    if (params.regenerateFields.narration) fieldsToRegenerate.push('narration')
+
+    if (fieldsToRegenerate.length === 0) {
+      return { success: false, error: 'No fields selected for regeneration' }
+    }
+
+    // Build the system prompt for single slide regeneration
+    const systemPrompt = `You are an expert explainer video content strategist regenerating a single slide.
+
+Your task is to regenerate specific fields for slide ${params.slideNum + 1} of an explainer video.
+
+AVAILABLE LAYOUTS: "text-left-image-right", "text-right-image-left", "center", "text-top-image-bottom", "full-visual", "split-50-50"
+
+VISUAL TYPES: "pexels", "gemini", "diagram", "chart", "none"
+- "pexels": Stock photos - provide pexelsKeywords for search
+- "gemini": AI-generated custom images - provide detailed geminiPrompt
+- "diagram": For flowcharts, processes - provide diagramDescription
+- "none": Text-only slide
+
+Return a JSON object with ONLY the requested fields. Do not include fields that were not requested.`
+
+    // Build user prompt with context
+    let userPrompt = `Regenerate the following fields for this slide: ${fieldsToRegenerate.join(', ')}
+
+VIDEO CONTEXT:
+- Topic: ${project.config?.topic || project.name}
+- Description: ${project.config?.description || 'Explainer video'}
+- Total slides: ${project.slides.length}
+- This is slide ${params.slideNum + 1} of ${project.slides.length}
+
+`
+
+    if (prevSlide) {
+      userPrompt += `PREVIOUS SLIDE (for context/continuity):
+- Headline: "${prevSlide.headline || 'N/A'}"
+- Narration: "${(prevSlide.narration || '').substring(0, 150)}..."
+
+`
+    } else {
+      userPrompt += `This is the FIRST slide (intro slide).
+
+`
+    }
+
+    if (nextSlide) {
+      userPrompt += `NEXT SLIDE (for context/continuity):
+- Headline: "${nextSlide.headline || 'N/A'}"
+- Narration: "${(nextSlide.narration || '').substring(0, 150)}..."
+
+`
+    } else {
+      userPrompt += `This is the LAST slide (outro/conclusion slide).
+
+`
+    }
+
+    userPrompt += `CURRENT SLIDE CONTENT (for reference):
+- Headline: "${currentSlide.headline || 'N/A'}"
+- Subheadline: "${currentSlide.subheadline || 'N/A'}"
+- Body: "${(currentSlide.bodyText || '').substring(0, 200)}"
+- Bullets: ${currentSlide.bullets ? JSON.stringify(currentSlide.bullets) : 'None'}
+- Layout: ${currentSlide.layout}
+- Visual Type: ${currentSlide.visualType || 'none'}
+- Narration: "${(currentSlide.narration || '').substring(0, 200)}..."
+
+`
+
+    if (params.customInstructions) {
+      userPrompt += `USER INSTRUCTIONS:
+${params.customInstructions}
+
+`
+    }
+
+    userPrompt += `Generate improved content for ONLY these fields: ${fieldsToRegenerate.join(', ')}
+
+Return a valid JSON object with only the requested fields.`
+
+    const OpenAI = (await import('openai')).default
+    const openai = new OpenAI({ apiKey })
+
+    console.log('Regenerating slide with prompt:', userPrompt.substring(0, 500) + '...')
+
+    const response = await openai.chat.completions.create({
+      model: 'gpt-5.2',
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt }
+      ],
+      response_format: { type: 'json_object' },
+      temperature: 0.7
+    })
+
+    const content = response.choices[0].message.content
+    if (!content) {
+      return { success: false, error: 'No response from AI' }
+    }
+
+    const regeneratedData = JSON.parse(content) as RegeneratedSlideData
+
+    // Calculate cost
+    const inputTokens = response.usage?.prompt_tokens || 0
+    const outputTokens = response.usage?.completion_tokens || 0
+    const cost = (inputTokens / 1_000_000 * 2.5) + (outputTokens / 1_000_000 * 10)
+
+    console.log('Slide regenerated successfully:', regeneratedData)
+
+    return { success: true, data: regeneratedData, cost }
+  } catch (e: any) {
+    console.error('Slide regeneration error:', e)
+    return { success: false, error: e.message }
+  }
+})
+
+// ============================================
 // DIAGRAM GENERATION (OpenAI)
 // ============================================
 
