@@ -350,6 +350,108 @@ export const useProjectStore = defineStore('project', () => {
     error.value = null
   }
 
+  function addBlankSlide(afterIndex?: number): Slide | null {
+    if (!project.value) return null
+
+    const slides = project.value.slides
+    const insertIndex = afterIndex !== undefined ? afterIndex + 1 : slides.length
+    const newSlideNum = slides.length // Will be renumbered
+
+    // Create blank slide
+    const blankSlide: Slide = {
+      id: `slide_${Date.now()}`,
+      slideNum: newSlideNum,
+      status: 'pending',
+      headline: 'New Slide',
+      subheadline: null,
+      bodyText: null,
+      bullets: null,
+      visualType: 'none',
+      visualData: null,
+      layout: 'text-left-image-right',
+      elements: [
+        {
+          id: `headline_${newSlideNum}_${Date.now()}`,
+          type: 'headline',
+          x: 5,
+          y: 10,
+          width: 40,
+          height: 15,
+          zIndex: 10,
+          content: 'New Slide',
+          imagePath: null,
+          styles: {
+            fontSize: 48,
+            fontWeight: 'bold',
+            color: '#1f2937',
+            textAlign: 'left'
+          }
+        },
+        {
+          id: `image_${newSlideNum}_${Date.now()}`,
+          type: 'image',
+          x: 50,
+          y: 10,
+          width: 45,
+          height: 80,
+          zIndex: 5,
+          content: null,
+          imagePath: null,
+          styles: {
+            borderRadius: 12
+          }
+        }
+      ],
+      backgroundType: 'solid',
+      backgroundColor: '#ffffff',
+      backgroundGradient: null,
+      backgroundImagePath: null,
+      backgroundSize: null,
+      backgroundPosition: null,
+      narration: '',
+      pngPath: null,
+      htmlPath: null,
+      audioPath: null,
+      audioDuration: null
+    }
+
+    // Insert at position
+    slides.splice(insertIndex, 0, blankSlide)
+
+    // Renumber all slides
+    slides.forEach((slide, index) => {
+      slide.slideNum = index
+    })
+
+    // Save project
+    saveProject()
+
+    return blankSlide
+  }
+
+  function deleteSlide(slideNum: number): boolean {
+    if (!project.value) return false
+
+    const slides = project.value.slides
+    if (slides.length <= 1) return false // Don't delete last slide
+
+    const slideIndex = slides.findIndex(s => s.slideNum === slideNum)
+    if (slideIndex < 0) return false
+
+    // Remove slide
+    slides.splice(slideIndex, 1)
+
+    // Renumber all slides
+    slides.forEach((slide, index) => {
+      slide.slideNum = index
+    })
+
+    // Save project
+    saveProject()
+
+    return true
+  }
+
   async function regenerateSlide(
     slideNum: number,
     customInstructions: string,
@@ -522,6 +624,8 @@ export const useProjectStore = defineStore('project', () => {
     setStatus,
     addCost,
     clearProject,
+    addBlankSlide,
+    deleteSlide,
     regenerateSlide
   }
 })

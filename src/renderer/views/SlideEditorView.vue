@@ -1,13 +1,13 @@
 <template>
   <div class="flex-1 flex h-full">
     <!-- Left sidebar: Slide navigation -->
-    <div class="w-48 bg-gray-100 border-r border-gray-200 p-3 overflow-y-auto">
+    <div class="w-48 bg-gray-100 border-r border-gray-200 p-3 overflow-y-auto flex flex-col">
       <div class="flex items-center justify-between mb-3">
         <h3 class="text-sm font-medium text-gray-700">Slides</h3>
         <span class="text-xs text-gray-500">{{ slidesStore.completedCount }}/{{ slidesStore.slides.length }}</span>
       </div>
 
-      <div class="space-y-2">
+      <div class="space-y-2 flex-1">
         <div
           v-for="(slide, index) in slidesStore.slides"
           :key="slide.id"
@@ -48,6 +48,29 @@
           </div>
           <div class="text-xs text-center py-1 bg-gray-50">{{ index + 1 }}</div>
         </div>
+      </div>
+
+      <!-- Add/Delete Slide Buttons -->
+      <div class="mt-3 pt-3 border-t border-gray-200 space-y-2">
+        <button
+          @click="addNewSlide"
+          class="w-full flex items-center justify-center gap-1.5 px-2 py-1.5 text-xs font-medium text-primary-600 bg-primary-50 hover:bg-primary-100 rounded-lg transition-colors"
+        >
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+          </svg>
+          Add Slide
+        </button>
+        <button
+          v-if="slidesStore.slides.length > 1"
+          @click="deleteCurrentSlide"
+          class="w-full flex items-center justify-center gap-1.5 px-2 py-1.5 text-xs font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors"
+        >
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+          </svg>
+          Delete Slide
+        </button>
       </div>
     </div>
 
@@ -332,6 +355,29 @@ async function saveSlide() {
   saving.value = true
   await projectStore.saveProject()
   saving.value = false
+}
+
+function addNewSlide() {
+  const newSlide = projectStore.addBlankSlide(slidesStore.activeSlideIndex)
+  if (newSlide) {
+    // Select the new slide
+    slidesStore.setActiveSlide(slidesStore.activeSlideIndex + 1)
+  }
+}
+
+function deleteCurrentSlide() {
+  if (!slidesStore.activeSlide || slidesStore.slides.length <= 1) return
+
+  if (confirm('Are you sure you want to delete this slide?')) {
+    const currentIndex = slidesStore.activeSlideIndex
+    const deleted = projectStore.deleteSlide(slidesStore.activeSlide.slideNum)
+
+    if (deleted) {
+      // Select previous slide or first slide
+      const newIndex = Math.max(0, currentIndex - 1)
+      slidesStore.setActiveSlide(newIndex)
+    }
+  }
 }
 
 function proceedToAudio() {

@@ -41,24 +41,41 @@
         <!-- Duration & Slides -->
         <div class="grid grid-cols-2 gap-4">
           <div>
-            <label class="label">Target Duration</label>
-            <select v-model="config.targetDuration" class="input">
-              <option :value="30">30 seconds</option>
-              <option :value="60">60 seconds</option>
-              <option :value="90">90 seconds</option>
-              <option :value="120">2 minutes</option>
-              <option :value="180">3 minutes</option>
-            </select>
+            <label class="label">Target Duration (seconds)</label>
+            <input
+              v-model.number="config.targetDuration"
+              type="number"
+              min="15"
+              max="600"
+              step="5"
+              class="input"
+              placeholder="60"
+            />
+            <p class="text-xs text-gray-500 mt-1">15-600 seconds ({{ formatDuration(config.targetDuration) }})</p>
           </div>
           <div>
             <label class="label">Number of Slides</label>
-            <select v-model="numSlidesOption" class="input">
-              <option value="flexible">Flexible (AI decides)</option>
-              <option value="3">3 slides</option>
-              <option value="5">5 slides</option>
-              <option value="7">7 slides</option>
-              <option value="10">10 slides</option>
-            </select>
+            <div class="flex items-center gap-2">
+              <input
+                v-model.number="numSlidesValue"
+                type="number"
+                min="1"
+                max="20"
+                :disabled="flexibleSlides"
+                class="input flex-1"
+                :class="{ 'bg-gray-100': flexibleSlides }"
+                placeholder="5"
+              />
+              <label class="flex items-center gap-1.5 text-sm whitespace-nowrap cursor-pointer">
+                <input
+                  v-model="flexibleSlides"
+                  type="checkbox"
+                  class="w-4 h-4 text-primary-600 rounded border-gray-300"
+                />
+                <span class="text-gray-600">AI decides</span>
+              </label>
+            </div>
+            <p class="text-xs text-gray-500 mt-1">1-20 slides</p>
           </div>
         </div>
 
@@ -180,7 +197,8 @@ const settingsStore = useSettingsStore()
 const projectStore = useProjectStore()
 
 const loading = ref(false)
-const numSlidesOption = ref<string>('5')
+const numSlidesValue = ref(5)
+const flexibleSlides = ref(false)
 
 const config = ref<ProjectConfig>({
   topic: '',
@@ -221,13 +239,18 @@ function removeDocument(docId: string) {
   config.value.groundedMaterial = config.value.groundedMaterial.filter(d => d.id !== docId)
 }
 
+function formatDuration(seconds: number): string {
+  if (seconds < 60) return `${seconds}s`
+  const mins = Math.floor(seconds / 60)
+  const secs = seconds % 60
+  return secs > 0 ? `${mins}m ${secs}s` : `${mins}m`
+}
+
 async function createProject() {
   loading.value = true
 
   // Set numSlides based on selection
-  config.value.numSlides = numSlidesOption.value === 'flexible'
-    ? 'flexible'
-    : parseInt(numSlidesOption.value)
+  config.value.numSlides = flexibleSlides.value ? 'flexible' : numSlidesValue.value
 
   try {
     const success = await projectStore.createProject(config.value)
