@@ -191,7 +191,6 @@ function handleResizeStart(event: MouseEvent, element: SlideElement, corner: str
   dragElement.value = element
   resizeCorner.value = corner
 
-  const rect = canvasRef.value.getBoundingClientRect()
   resizeStart.value = {
     x: event.clientX,
     y: event.clientY,

@@ -318,7 +318,7 @@ const elevenLabsKey = ref('')
 const removeBgKey = ref('')
 
 // Defaults
-const defaultVoiceProvider = ref('openai')
+const defaultVoiceProvider = ref<'openai' | 'elevenlabs'>('openai')
 const defaultVoice = ref('nova')
 const defaultDuration = ref(60)
 const defaultNumSlides = ref(5)

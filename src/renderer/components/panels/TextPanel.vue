@@ -47,7 +47,7 @@
         <label class="label">Bullet Points</label>
         <div class="space-y-2">
           <div
-            v-for="(bullet, index) in localBullets"
+            v-for="(_, index) in localBullets"
             :key="index"
             class="flex gap-2"
           >

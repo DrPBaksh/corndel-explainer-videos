@@ -190,7 +190,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useSettingsStore } from '../stores/settingsStore'
 import { useProjectStore } from '../stores/projectStore'
-import type { ProjectConfig, GroundedDocument } from '@shared/types'
+import type { ProjectConfig } from '@shared/types'
 
 const router = useRouter()
 const settingsStore = useSettingsStore()

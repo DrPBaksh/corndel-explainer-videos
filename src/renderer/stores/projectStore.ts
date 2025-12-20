@@ -3,7 +3,6 @@ import { ref, computed, toRaw } from 'vue'
 import type {
   Project,
   ProjectConfig,
-  ContentStrategy,
   Slide,
   SlideStrategy,
   SlideElement,
@@ -156,7 +155,7 @@ export const useProjectStore = defineStore('project', () => {
     const layout = strategy.layout
 
     // Define positions based on layout
-    let textX = 5, textY = 10, textWidth = 40, textHeight = 80
+    let textX = 5, textY = 10, textWidth = 40
     let imageX = 50, imageY = 10, imageWidth = 45, imageHeight = 80
 
     if (layout === 'text-right-image-left') {
@@ -165,12 +164,10 @@ export const useProjectStore = defineStore('project', () => {
     } else if (layout === 'center') {
       textX = 10
       textWidth = 80
-      textHeight = 90
     } else if (layout === 'text-top-image-bottom') {
       textX = 10
       textY = 5
       textWidth = 80
-      textHeight = 35
       imageX = 10
       imageY = 45
       imageWidth = 80

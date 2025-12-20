@@ -129,6 +129,11 @@ export interface Slide {
   visualType: VisualType
   visualData: VisualData | null
 
+  // Visual generation hints (from content strategy)
+  pexelsKeywords: string | null
+  geminiPrompt: string | null
+  diagramDescription: string | null
+
   // Layout
   layout: LayoutType
 
@@ -145,6 +150,9 @@ export interface Slide {
 
   // Narration
   narration: string
+
+  // Timing
+  duration: number | null              // Duration in seconds
 
   // Generated assets
   pngPath: string | null
@@ -169,6 +177,11 @@ export interface SlideElement {
   content: string | null             // For text elements
   imagePath: string | null           // For image elements
   styles: ElementStyles
+  // Direct styling (alternative to styles object)
+  fontSize?: number
+  fontWeight?: string
+  color?: string
+  textAlign?: 'left' | 'center' | 'right'
 }
 
 export type ElementType = 'headline' | 'subheadline' | 'body' | 'bullets' | 'image'
@@ -193,6 +206,8 @@ export interface VisualData {
   sourceUrl: string | null           // Pexels URL
   generationPrompt: string | null    // What was used to generate
   thumbnailPath: string | null
+  source?: string                    // Source identifier (e.g., 'pexels', 'upload', 'gallery')
+  metadata?: Record<string, any>     // Additional metadata (objectFit, objectPosition, etc.)
 }
 
 // ============================================
@@ -261,6 +276,8 @@ export interface ProgressUpdate {
   message: string
   currentItem: number | null
   totalItems: number | null
+  type?: string                      // Type of progress (e.g., 'slide', 'audio', 'video')
+  slideIndex?: number                // Current slide being processed
 }
 
 export interface GenerationResult<T> {

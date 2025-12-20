@@ -275,17 +275,6 @@ function encodeFilePath(path: string): string {
   return `file://${encoded}`
 }
 
-// Get the image path from slide's visual data or image element
-function getSlideImagePath(slide: Slide): string | null {
-  // First check visualData
-  if (slide.visualData?.imagePath) {
-    return slide.visualData.imagePath
-  }
-  // Then check elements for an image element
-  const imageEl = slide.elements?.find(e => e.type === 'image' && e.imagePath)
-  return imageEl?.imagePath || null
-}
-
 function getSlideBackgroundStyle(slide: Slide): Record<string, string> {
   if (slide.backgroundType === 'gradient' && slide.backgroundGradient) {
     return { background: slide.backgroundGradient }
