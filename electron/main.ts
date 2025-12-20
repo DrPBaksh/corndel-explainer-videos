@@ -1141,8 +1141,8 @@ ipcMain.handle('get-bundled-reference-images', async (): Promise<ReferenceImage[
   if (isDev) {
     refDir = join(__dirname, '..', 'public', 'reference-images')
   } else {
-    const asarUnpackedPath = __dirname.replace('app.asar', 'app.asar.unpacked')
-    refDir = join(asarUnpackedPath, '..', 'dist', 'reference-images')
+    // In production, extraResources are placed in process.resourcesPath
+    refDir = join(process.resourcesPath, 'reference-images')
   }
 
   console.log('Looking for reference images in:', refDir)
@@ -1996,7 +1996,15 @@ ipcMain.handle('save-video-as', async (_event, sourcePath: string, projectName: 
 // ============================================
 
 ipcMain.handle('get-template-params', async (): Promise<TemplateParams> => {
-  const templatePath = join(__dirname, '..', 'templates', 'template-params.json')
+  const isDev = process.env.VITE_DEV_SERVER_URL
+  let templatePath: string
+
+  if (isDev) {
+    templatePath = join(__dirname, '..', 'templates', 'template-params.json')
+  } else {
+    // In production, extraResources are placed in process.resourcesPath
+    templatePath = join(process.resourcesPath, 'templates', 'template-params.json')
+  }
 
   if (existsSync(templatePath)) {
     return JSON.parse(readFileSync(templatePath, 'utf-8'))
