@@ -245,7 +245,7 @@ const canGenerate = computed(() =>
 )
 
 const totalDuration = computed(() =>
-  slides.value.reduce((sum, s) => sum + (s.audioDuration || s.duration), 0)
+  slides.value.reduce((sum, s) => sum + (s.audioDuration || s.duration || 0), 0)
 )
 
 const statusText = computed(() => {

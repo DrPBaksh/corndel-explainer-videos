@@ -133,7 +133,7 @@ const estimatedDuration = computed(() => {
 
 const durationDiff = computed(() => {
   if (!props.slide) return 0
-  return estimatedDuration.value - props.slide.duration
+  return estimatedDuration.value - (props.slide.duration || 0)
 })
 
 const durationClass = computed(() => {

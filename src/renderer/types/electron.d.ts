@@ -32,7 +32,7 @@ export interface ElectronAPI {
   generateContentStrategy: (config: ProjectConfig) => Promise<{ success: boolean; data?: ContentStrategy; error?: string; cost?: number }>
   generateDiagram: (description: string) => Promise<{ success: boolean; data?: string; error?: string }>
   generateDiagramHtml: (description: string, colors: { primary: string; secondary: string; accent: string }) => Promise<{ success: boolean; data?: string; error?: string; cost?: number }>
-  generateNarration: (context: { topic: string; slideNum: number; headline: string | null; subheadline: string | null; bodyText: string | null; bullets: string[] | null; duration: number | null }) => Promise<{ success: boolean; data?: string; error?: string; cost?: number }>
+  generateNarration: (context: { topic?: string; slideNum?: number; headline: string | null; subheadline: string | null; bodyText: string | null; bullets: string[] | null; duration: number | null }) => Promise<{ success: boolean; data?: string; error?: string; cost?: number }>
 
   // Slide Regeneration
   regenerateSlide: (params: {
