@@ -65,6 +65,7 @@ export interface ElectronAPI {
   generateImage: (prompt: string, model?: string) => Promise<{ success: boolean; data?: string; error?: string }>
   generateGenaiImage: (prompt: string, options: GenAIOptions, outputPath: string) => Promise<{ success: boolean; data?: { imagePath: string; imageBase64: string }; error?: string; cost?: number }>
   generateOpenAIImage: (prompt: string, model?: string) => Promise<{ success: boolean; data?: string; error?: string; cost?: number }>
+  removeBackground: (imagePath: string) => Promise<{ success: boolean; data?: string; error?: string; cost?: number }>
   searchPexels: (query: string, count?: number) => Promise<{ success: boolean; data?: PexelsImage[]; error?: string }>
   downloadPexelsImage: (imageUrl: string, outputPath: string) => Promise<{ success: boolean; data?: string; error?: string }>
 

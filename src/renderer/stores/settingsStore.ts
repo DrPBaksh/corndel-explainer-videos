@@ -9,6 +9,7 @@ export const useSettingsStore = defineStore('settings', () => {
     hasElevenLabsKey: false,
     hasGenAIKey: false,
     hasPexelsKey: false,
+    hasRemoveBgKey: false,
     defaultVoiceProvider: 'openai',
     defaultVoice: 'nova',
     defaultOutputDir: '',
@@ -31,6 +32,7 @@ export const useSettingsStore = defineStore('settings', () => {
   const canGenerateImages = computed(() => settings.value.hasGenAIKey)
   const canSearchPexels = computed(() => settings.value.hasPexelsKey)
   const canUseElevenLabs = computed(() => settings.value.hasElevenLabsKey)
+  const canRemoveBackground = computed(() => settings.value.hasRemoveBgKey)
 
   // Actions
   async function loadSettings(): Promise<void> {
@@ -103,6 +105,7 @@ export const useSettingsStore = defineStore('settings', () => {
     canGenerateImages,
     canSearchPexels,
     canUseElevenLabs,
+    canRemoveBackground,
 
     // Actions
     loadSettings,

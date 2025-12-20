@@ -157,6 +157,43 @@
                 </button>
               </div>
             </div>
+
+            <!-- Remove.bg -->
+            <div>
+              <div class="flex items-center justify-between mb-2">
+                <div>
+                  <h3 class="font-medium text-gray-900">Remove.bg</h3>
+                  <p class="text-sm text-gray-500">Optional: Background removal from images</p>
+                </div>
+                <span
+                  class="badge"
+                  :class="settingsStore.settings.hasRemoveBgKey ? 'badge-green' : 'badge-gray'"
+                >
+                  {{ settingsStore.settings.hasRemoveBgKey ? 'Configured' : 'Not Set' }}
+                </span>
+              </div>
+              <div class="flex gap-2">
+                <input
+                  v-model="removeBgKey"
+                  type="password"
+                  class="input flex-1"
+                  placeholder="Enter Remove.bg API key"
+                />
+                <button @click="saveApiKey('removeBg', removeBgKey)" class="btn-primary" :disabled="!removeBgKey">
+                  Save
+                </button>
+                <button
+                  v-if="settingsStore.settings.hasRemoveBgKey"
+                  @click="clearApiKey('removeBg')"
+                  class="btn-secondary"
+                >
+                  Clear
+                </button>
+              </div>
+              <p class="text-xs text-gray-500 mt-1">
+                Get your API key at <a href="https://www.remove.bg/api" target="_blank" class="text-primary-600 hover:underline">remove.bg/api</a>
+              </p>
+            </div>
           </div>
         </div>
 
@@ -278,6 +315,7 @@ const openAIKey = ref('')
 const genAIKey = ref('')
 const pexelsKey = ref('')
 const elevenLabsKey = ref('')
+const removeBgKey = ref('')
 
 // Defaults
 const defaultVoiceProvider = ref('openai')
@@ -307,6 +345,7 @@ async function saveApiKey(provider: string, key: string) {
       case 'genAI': genAIKey.value = ''; break
       case 'pexels': pexelsKey.value = ''; break
       case 'elevenLabs': elevenLabsKey.value = ''; break
+      case 'removeBg': removeBgKey.value = ''; break
     }
   } else {
     alert(result.message || 'Failed to save API key')

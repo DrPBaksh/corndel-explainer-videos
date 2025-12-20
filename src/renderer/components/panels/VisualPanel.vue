@@ -61,6 +61,21 @@
           </div>
         </div>
 
+        <!-- Remove Background Button -->
+        <div class="pt-2 border-t border-gray-200">
+          <button
+            @click="removeBackground"
+            :disabled="removingBackground || !canRemoveBackground"
+            class="btn-secondary w-full text-sm"
+            :class="{ 'opacity-50 cursor-not-allowed': !canRemoveBackground }"
+          >
+            {{ removingBackground ? 'Removing Background...' : 'Remove Background' }}
+          </button>
+          <p v-if="!canRemoveBackground" class="text-xs text-gray-500 mt-1">
+            Configure Remove.bg API key in Settings to enable this feature.
+          </p>
+        </div>
+
         <button
           @click="clearVisual"
           class="text-red-500 hover:text-red-700 text-xs"
@@ -239,6 +254,7 @@
 <script setup lang="ts">
 import { ref, watch, onMounted, computed } from 'vue'
 import type { Slide, VisualData, VisualType } from '@shared/types'
+import { useSettingsStore } from '../../stores/settingsStore'
 
 const props = defineProps<{
   slide: Slide | null
@@ -247,6 +263,10 @@ const props = defineProps<{
 const emit = defineEmits<{
   'update-visual': [visualData: VisualData]
 }>()
+
+const settingsStore = useSettingsStore()
+const canRemoveBackground = computed(() => settingsStore.canRemoveBackground)
+const removingBackground = ref(false)
 
 // Matches the PexelsImage type from backend
 interface PexelsPhoto {
@@ -376,6 +396,10 @@ const visualPreviewStyle = computed(() => {
 onMounted(async () => {
   await loadReferenceImages()
   await loadGalleryImages()
+  // Ensure settings are loaded for canRemoveBackground check
+  if (!settingsStore.settings.hasRemoveBgKey) {
+    await settingsStore.loadSettings()
+  }
 })
 
 // Map VisualType to tab type
@@ -658,6 +682,43 @@ async function uploadImage() {
     }
   } catch (error) {
     console.error('Image upload failed:', error)
+  }
+}
+
+async function removeBackground() {
+  if (!props.slide?.visualData?.imagePath) {
+    alert('No image to process')
+    return
+  }
+
+  removingBackground.value = true
+  try {
+    console.log('Removing background from:', props.slide.visualData.imagePath)
+    const result = await window.electronAPI.removeBackground(props.slide.visualData.imagePath)
+    console.log('Remove background result:', result)
+
+    if (result.success && result.data) {
+      emit('update-visual', {
+        ...props.slide.visualData,
+        imagePath: result.data,
+        metadata: {
+          ...(props.slide.visualData.metadata || {}),
+          backgroundRemoved: true,
+          objectFit: visualSize.value,
+          objectPosition: visualPosition.value
+        }
+      } as any)
+      // Refresh gallery since new image was saved
+      await loadGalleryImages()
+    } else {
+      console.error('Background removal failed:', result.error)
+      alert('Background removal failed: ' + (result.error || 'Unknown error'))
+    }
+  } catch (error) {
+    console.error('Background removal failed:', error)
+    alert('Background removal failed: ' + error)
+  } finally {
+    removingBackground.value = false
   }
 }
 </script>

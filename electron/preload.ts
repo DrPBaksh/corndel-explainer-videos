@@ -92,6 +92,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   generateOpenAIImage: (prompt: string, model?: string): Promise<{ success: boolean; data?: string; error?: string; cost?: number }> =>
     ipcRenderer.invoke('generate-openai-image', prompt, model),
 
+  removeBackground: (imagePath: string): Promise<{ success: boolean; data?: string; error?: string; cost?: number }> =>
+    ipcRenderer.invoke('remove-background', imagePath),
+
   searchPexels: (query: string, count?: number): Promise<{ success: boolean; data?: PexelsImage[]; error?: string }> =>
     ipcRenderer.invoke('search-pexels', query, count),
 

@@ -117,6 +117,7 @@ ipcMain.handle('get-settings', async (): Promise<AppSettings> => {
     hasElevenLabsKey: !!apiKeyStore.get('elevenlabs'),
     hasGenAIKey: !!apiKeyStore.get('genai'),
     hasPexelsKey: !!apiKeyStore.get('pexels'),
+    hasRemoveBgKey: !!apiKeyStore.get('removebg'),
     defaultVoiceProvider: settingsStore.get('defaultVoiceProvider') as 'openai' | 'elevenlabs',
     defaultVoice: settingsStore.get('defaultVoice') as string,
     defaultOutputDir: settingsStore.get('defaultOutputDir') as string,
@@ -129,7 +130,7 @@ ipcMain.handle('get-settings', async (): Promise<AppSettings> => {
 
 ipcMain.handle('save-settings', async (_event, settings: Partial<AppSettings>): Promise<boolean> => {
   try {
-    const { hasOpenAIKey, hasElevenLabsKey, hasGenAIKey, hasPexelsKey, ...rest } = settings
+    const { hasOpenAIKey, hasElevenLabsKey, hasGenAIKey, hasPexelsKey, hasRemoveBgKey, ...rest } = settings
     Object.entries(rest).forEach(([key, value]) => {
       if (value !== undefined) {
         settingsStore.set(key, value)
@@ -928,6 +929,64 @@ ipcMain.handle('generate-openai-image', async (_event, prompt: string, model: st
     return { success: true, data: outputPath, cost }
   } catch (e: any) {
     console.error('OpenAI image generation error:', e)
+    return { success: false, error: e.message }
+  }
+})
+
+// ============================================
+// BACKGROUND REMOVAL (Remove.bg)
+// ============================================
+
+ipcMain.handle('remove-background', async (_event, imagePath: string): Promise<{ success: boolean; data?: string; error?: string; cost?: number }> => {
+  const apiKey = apiKeyStore.get('removebg') as string
+  if (!apiKey) {
+    return { success: false, error: 'Remove.bg API key not configured. Add it in Settings.' }
+  }
+
+  try {
+    console.log('Removing background from:', imagePath)
+
+    // Read the image file
+    const imageBuffer = readFileSync(imagePath)
+    const base64Image = imageBuffer.toString('base64')
+
+    // Call remove.bg API
+    const formData = new FormData()
+    formData.append('image_file_b64', base64Image)
+    formData.append('size', 'auto')
+    formData.append('format', 'png')
+
+    const response = await fetch('https://api.remove.bg/v1.0/removebg', {
+      method: 'POST',
+      headers: {
+        'X-Api-Key': apiKey
+      },
+      body: formData
+    })
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}))
+      console.error('Remove.bg API error:', errorData)
+      return { success: false, error: `Remove.bg error: ${response.status} - ${errorData.errors?.[0]?.title || 'Unknown error'}` }
+    }
+
+    // Get the result image
+    const resultBuffer = Buffer.from(await response.arrayBuffer())
+
+    // Save to same directory with _nobg suffix
+    const ext = '.png'
+    const baseName = imagePath.replace(/\.[^.]+$/, '')
+    const outputPath = `${baseName}_nobg${ext}`
+
+    writeFileSync(outputPath, resultBuffer)
+    console.log('Background removed, saved to:', outputPath)
+
+    // Cost: remove.bg charges ~$0.20 per image for API (depends on plan)
+    const cost = 0.20
+
+    return { success: true, data: outputPath, cost }
+  } catch (e: any) {
+    console.error('Background removal error:', e)
     return { success: false, error: e.message }
   }
 })

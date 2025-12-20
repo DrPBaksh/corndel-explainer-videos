@@ -318,6 +318,7 @@ export interface AppSettings {
   hasElevenLabsKey: boolean
   hasGenAIKey: boolean
   hasPexelsKey: boolean
+  hasRemoveBgKey: boolean
 
   // Preferences
   defaultVoiceProvider: 'openai' | 'elevenlabs'

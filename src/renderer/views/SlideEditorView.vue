@@ -24,21 +24,36 @@
               class="absolute inset-0"
               :style="getSlideBackgroundStyle(slide)"
             ></div>
-            <!-- Visual image (if any) -->
+            <!-- Render elements based on actual positions -->
             <div
-              v-if="getSlideImagePath(slide)"
-              class="absolute right-0 top-0 w-1/2 h-full"
+              v-for="element in slide.elements"
+              :key="element.id"
+              class="absolute overflow-hidden"
+              :style="getThumbnailElementStyle(element)"
             >
+              <!-- Text elements -->
+              <div v-if="element.type === 'headline'" class="text-[6px] font-bold text-gray-800 leading-tight line-clamp-2">
+                {{ element.content }}
+              </div>
+              <div v-else-if="element.type === 'subheadline'" class="text-[5px] font-medium text-gray-600 leading-tight line-clamp-2">
+                {{ element.content }}
+              </div>
+              <div v-else-if="element.type === 'body'" class="text-[4px] text-gray-600 leading-tight line-clamp-3">
+                {{ element.content }}
+              </div>
+              <div v-else-if="element.type === 'bullets'" class="text-[4px] text-gray-600 leading-tight">
+                <div v-for="(bullet, bi) in (element.content || '').split('\n').slice(0, 3)" :key="bi" class="truncate">
+                  • {{ bullet }}
+                </div>
+              </div>
+              <!-- Image element -->
               <img
-                :src="encodeFilePath(getSlideImagePath(slide)!)"
-                class="w-full h-full object-cover"
+                v-else-if="element.type === 'image' && element.imagePath"
+                :src="encodeFilePath(element.imagePath)"
+                class="w-full h-full"
+                :style="getThumbnailImageStyle(element)"
                 alt=""
               />
-            </div>
-            <!-- Text content -->
-            <div class="absolute inset-0 p-1.5">
-              <p class="text-[7px] font-semibold text-gray-800 line-clamp-1">{{ slide.headline }}</p>
-              <p v-if="slide.subheadline" class="text-[5px] text-gray-600 line-clamp-1">{{ slide.subheadline }}</p>
             </div>
             <!-- Status indicator -->
             <div
@@ -227,7 +242,7 @@ import VisualPanel from '../components/panels/VisualPanel.vue'
 import BackgroundPanel from '../components/panels/BackgroundPanel.vue'
 import NarrationPanel from '../components/panels/NarrationPanel.vue'
 import AIPanel from '../components/panels/AIPanel.vue'
-import type { Slide, VisualData } from '@shared/types'
+import type { Slide, SlideElement, VisualData } from '@shared/types'
 
 const route = useRoute()
 const router = useRouter()
@@ -283,6 +298,24 @@ function getSlideBackgroundStyle(slide: Slide): Record<string, string> {
     }
   } else {
     return { backgroundColor: slide.backgroundColor || '#ffffff' }
+  }
+}
+
+function getThumbnailElementStyle(element: SlideElement): Record<string, string> {
+  return {
+    left: `${element.x}%`,
+    top: `${element.y}%`,
+    width: `${element.width}%`,
+    height: `${element.height}%`,
+    color: element.color || '#1f2937'
+  }
+}
+
+function getThumbnailImageStyle(element: SlideElement): Record<string, string> {
+  const styles = element.styles || {}
+  return {
+    objectFit: (styles.objectFit as string) || 'cover',
+    objectPosition: (styles.objectPosition as string) || 'center'
   }
 }
 

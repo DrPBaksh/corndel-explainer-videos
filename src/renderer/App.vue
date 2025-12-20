@@ -4,9 +4,11 @@
     <header class="bg-white border-b border-gray-200 px-6 py-3 flex items-center justify-between">
       <div class="flex items-center gap-4">
         <router-link to="/" class="flex items-center gap-2">
-          <div class="w-8 h-8 bg-corndel-purple rounded-lg flex items-center justify-center">
-            <span class="text-white font-bold text-sm">C</span>
-          </div>
+          <img
+            src="/corndel-logo.png"
+            alt="Corndel"
+            class="h-8 w-auto"
+          />
           <span class="font-semibold text-gray-900">Explainer Videos</span>
         </router-link>
 
