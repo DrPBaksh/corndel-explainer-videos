@@ -660,6 +660,96 @@ ipcMain.handle('generate-image', async (_event, prompt: string, model: string = 
   }
 })
 
+// ============================================
+// IMAGE GENERATION (OpenAI)
+// ============================================
+
+ipcMain.handle('generate-openai-image', async (_event, prompt: string, model: string = 'gpt-image-1'): Promise<{ success: boolean; data?: string; error?: string; cost?: number }> => {
+  const apiKey = apiKeyStore.get('openai') as string
+  if (!apiKey) {
+    return { success: false, error: 'OpenAI API key not configured' }
+  }
+
+  console.log('Generating OpenAI image with model:', model, 'prompt:', prompt.substring(0, 50) + '...')
+
+  try {
+    const OpenAI = (await import('openai')).default
+    const openai = new OpenAI({ apiKey })
+
+    // Check if it's a GPT image model (gpt-image-1, gpt-image-1.5, etc.)
+    const isGptImageModel = model.startsWith('gpt-image')
+
+    let response
+    if (isGptImageModel) {
+      // GPT Image models use different parameters
+      response = await openai.images.generate({
+        model: model,
+        prompt: prompt,
+        n: 1,
+        size: '1024x1024' as any,
+        output_format: 'png'
+      } as any)
+    } else {
+      // DALL-E models use response_format
+      response = await openai.images.generate({
+        model: model,
+        prompt: prompt,
+        n: 1,
+        size: '1024x1024' as any,
+        response_format: 'b64_json'
+      })
+    }
+
+    if (!response.data || response.data.length === 0) {
+      return { success: false, error: 'No image in response' }
+    }
+
+    const imageData = response.data[0]
+
+    // Save to temp directory
+    const tempDir = join(app.getPath('temp'), 'corndel-videos', 'openai')
+    if (!existsSync(tempDir)) {
+      mkdirSync(tempDir, { recursive: true })
+    }
+
+    const outputPath = join(tempDir, `openai_${Date.now()}.png`)
+
+    // Handle both base64 and URL responses
+    if (imageData.b64_json) {
+      const buffer = Buffer.from(imageData.b64_json, 'base64')
+      writeFileSync(outputPath, buffer)
+      console.log('OpenAI image saved from base64 to:', outputPath)
+    } else if (imageData.url) {
+      // Download from URL
+      console.log('Downloading image from URL:', imageData.url)
+      const imageResponse = await fetch(imageData.url)
+      if (!imageResponse.ok) {
+        return { success: false, error: `Failed to download image: ${imageResponse.status}` }
+      }
+      const buffer = Buffer.from(await imageResponse.arrayBuffer())
+      writeFileSync(outputPath, buffer)
+      console.log('OpenAI image downloaded to:', outputPath)
+    } else {
+      return { success: false, error: 'No image data in response' }
+    }
+
+    // Auto-save to gallery
+    await saveToGallery(outputPath, 'genai')
+
+    // Calculate cost (approximate)
+    // gpt-image-1.5: ~$0.032 per image (20% cheaper than gpt-image-1)
+    // gpt-image-1: ~$0.04 per image for standard quality
+    // dall-e-3: ~$0.04-0.12 per image depending on size/quality
+    const cost = model === 'dall-e-3' ? 0.08 :
+                 model === 'gpt-image-1.5' ? 0.032 : 0.04
+
+    return { success: true, data: outputPath, cost }
+  } catch (e: any) {
+    console.error('OpenAI image generation error:', e)
+    return { success: false, error: e.message }
+  }
+})
+
 ipcMain.handle('generate-genai-image', async (_event, prompt: string, options: GenAIOptions, outputPath: string): Promise<{ success: boolean; data?: { imagePath: string; imageBase64: string }; error?: string; cost?: number }> => {
   const apiKey = apiKeyStore.get('genai') as string
   if (!apiKey) {

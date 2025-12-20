@@ -73,6 +73,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   generateGenaiImage: (prompt: string, options: GenAIOptions, outputPath: string): Promise<{ success: boolean; data?: { imagePath: string; imageBase64: string }; error?: string; cost?: number }> =>
     ipcRenderer.invoke('generate-genai-image', prompt, options, outputPath),
 
+  generateOpenAIImage: (prompt: string, model?: string): Promise<{ success: boolean; data?: string; error?: string; cost?: number }> =>
+    ipcRenderer.invoke('generate-openai-image', prompt, model),
+
   searchPexels: (query: string, count?: number): Promise<{ success: boolean; data?: PexelsImage[]; error?: string }> =>
     ipcRenderer.invoke('search-pexels', query, count),
 

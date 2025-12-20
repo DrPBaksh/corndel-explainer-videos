@@ -271,7 +271,7 @@ const pexelsLoading = ref(false)
 const pexelsResults = ref<PexelsPhoto[]>([])
 const genAIPrompt = ref('')
 const genAILoading = ref(false)
-const selectedImageModel = ref('flash')
+const selectedImageModel = ref('gpt-image-1.5')
 const diagramDescription = ref('')
 const diagramLoading = ref(false)
 const referenceImages = ref<ReferenceImage[]>([])
@@ -279,15 +279,37 @@ const galleryImages = ref<ReferenceImage[]>([])
 
 // Available image generation models
 const imageModels = [
+  // OpenAI models (best quality first)
+  {
+    value: 'gpt-image-1.5',
+    label: 'GPT Image 1.5',
+    description: 'OpenAI latest. 4x faster, better text rendering, 20% cheaper.',
+    provider: 'openai'
+  },
+  {
+    value: 'gpt-image-1',
+    label: 'GPT Image 1',
+    description: 'OpenAI standard. Good balance of quality and speed.',
+    provider: 'openai'
+  },
+  {
+    value: 'dall-e-3',
+    label: 'DALL-E 3',
+    description: 'OpenAI DALL-E 3. High quality, creative images.',
+    provider: 'openai'
+  },
+  // Gemini models
   {
     value: 'flash',
     label: 'Gemini 2.5 Flash',
-    description: 'Fast, good quality images. Best for quick iterations. Cheaper.'
+    description: 'Fast, good quality images. Best for quick iterations.',
+    provider: 'gemini'
   },
   {
     value: 'pro',
     label: 'Gemini 3 Pro',
-    description: 'Premium quality images. Slower but better results. More expensive.'
+    description: 'Premium quality images. Slower but better results.',
+    provider: 'gemini'
   }
 ]
 
@@ -520,12 +542,22 @@ async function generateImage() {
 
   genAILoading.value = true
   try {
-    console.log('Generating AI image with model:', selectedImageModel.value, 'prompt:', genAIPrompt.value)
-    const result = await window.electronAPI.generateImage(genAIPrompt.value, selectedImageModel.value)
+    const model = imageModels.find(m => m.value === selectedImageModel.value)
+    const provider = model?.provider || 'gemini'
+
+    console.log('Generating AI image with provider:', provider, 'model:', selectedImageModel.value, 'prompt:', genAIPrompt.value)
+
+    let result
+    if (provider === 'openai') {
+      result = await window.electronAPI.generateOpenAIImage(genAIPrompt.value, selectedImageModel.value)
+    } else {
+      result = await window.electronAPI.generateImage(genAIPrompt.value, selectedImageModel.value)
+    }
+
     console.log('Generate image result:', result)
     if (result.success && result.data) {
       emit('update-visual', {
-        type: 'gemini',
+        type: 'gemini', // Keep type as gemini for AI-generated images
         imagePath: result.data,
         imageBase64: null,
         sourceUrl: null,
@@ -533,6 +565,7 @@ async function generateImage() {
         thumbnailPath: null,
         metadata: {
           model: selectedImageModel.value,
+          provider: provider,
           objectFit: visualSize.value,
           objectPosition: visualPosition.value
         }
