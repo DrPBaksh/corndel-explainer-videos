@@ -143,6 +143,8 @@
         <SlideCanvas
           v-if="slidesStore.activeSlide"
           :slide="slidesStore.activeSlide"
+          :preview-time="animationPreviewTime"
+          :show-animations="showAnimations"
           @select-element="slidesStore.selectElement"
           @move-element="handleMoveElement"
           @resize-element="handleResizeElement"
@@ -197,6 +199,15 @@
           @update-narration="handleNarrationUpdate"
         />
 
+        <!-- Animation Panel -->
+        <AnimationPanel
+          v-if="activePanel === 'animation'"
+          :slide="slidesStore.activeSlide"
+          @update="handleAnimationSlideUpdate"
+          @update-element="handleAnimationElementUpdate"
+          @preview="handleAnimationPreview"
+        />
+
         <!-- AI Panel -->
         <AIPanel
           v-if="activePanel === 'ai'"
@@ -242,22 +253,28 @@ import VisualPanel from '../components/panels/VisualPanel.vue'
 import BackgroundPanel from '../components/panels/BackgroundPanel.vue'
 import NarrationPanel from '../components/panels/NarrationPanel.vue'
 import AIPanel from '../components/panels/AIPanel.vue'
-import type { Slide, SlideElement, VisualData } from '@shared/types'
+import AnimationPanel from '../components/panels/AnimationPanel.vue'
+import type { Slide, SlideElement, VisualData, ElementAnimation } from '@shared/types'
 
 const route = useRoute()
 const router = useRouter()
 const projectStore = useProjectStore()
 const slidesStore = useSlidesStore()
 
-const activePanel = ref<'text' | 'visual' | 'background' | 'narration' | 'ai'>('text')
+const activePanel = ref<'text' | 'visual' | 'background' | 'narration' | 'animation' | 'ai'>('text')
 const saving = ref(false)
 const aiPanelRef = ref<InstanceType<typeof AIPanel> | null>(null)
+
+// Animation preview state
+const animationPreviewTime = ref<number | null>(null)
+const showAnimations = ref(false)
 
 const panelTabs = [
   { value: 'text' as const, label: 'Text' },
   { value: 'visual' as const, label: 'Visual' },
-  { value: 'background' as const, label: 'Background' },
+  { value: 'background' as const, label: 'BG' },
   { value: 'narration' as const, label: 'Narration' },
+  { value: 'animation' as const, label: 'Animate' },
   { value: 'ai' as const, label: 'AI' }
 ]
 
@@ -330,6 +347,19 @@ function handleBackgroundUpdate(type: 'solid' | 'gradient' | 'image', value: str
 
 function handleNarrationUpdate(narration: string) {
   slidesStore.updateNarration(narration)
+}
+
+function handleAnimationSlideUpdate(updates: Partial<Slide>) {
+  slidesStore.updateSlideProperties(updates)
+}
+
+function handleAnimationElementUpdate(elementId: string, animation: ElementAnimation | null) {
+  slidesStore.updateElementAnimation(elementId, animation)
+}
+
+function handleAnimationPreview(time: number | null) {
+  animationPreviewTime.value = time
+  showAnimations.value = time !== null
 }
 
 async function handleRegenerate(params: {

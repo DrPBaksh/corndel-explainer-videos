@@ -6,7 +6,10 @@ import type {
   Slide,
   SlideStrategy,
   SlideElement,
-  LayoutType
+  LayoutType,
+  AnimationPlan,
+  AnimationType,
+  EasingType
 } from '@shared/types'
 
 export const useProjectStore = defineStore('project', () => {
@@ -124,6 +127,11 @@ export const useProjectStore = defineStore('project', () => {
   function createSlideFromStrategy(strategy: SlideStrategy): Slide {
     const elements = createDefaultElements(strategy)
 
+    // Apply animation plan from AI if present
+    if (strategy.animationPlan) {
+      applyAnimationPlanToElements(elements, strategy.animationPlan, strategy.duration)
+    }
+
     return {
       id: `slide_${strategy.slideNum}`,
       slideNum: strategy.slideNum,
@@ -150,7 +158,36 @@ export const useProjectStore = defineStore('project', () => {
       pngPath: null,
       htmlPath: null,
       audioPath: null,
-      audioDuration: null
+      audioDuration: null,
+      // Animation settings
+      animationsEnabled: true,
+      animationPlan: strategy.animationPlan,
+      transition: strategy.animationPlan?.transition
+    }
+  }
+
+  function applyAnimationPlanToElements(
+    elements: SlideElement[],
+    plan: AnimationPlan,
+    slideDuration: number
+  ): void {
+    for (const animConfig of plan.elementAnimations) {
+      // Find the element matching this animation config
+      const element = elements.find(e => e.type === animConfig.elementType)
+      if (element) {
+        // Convert relative timing to absolute seconds
+        const startTime = (animConfig.relativeStartPercent / 100) * slideDuration
+        const duration = (animConfig.durationPercent / 100) * slideDuration
+
+        element.animation = {
+          id: `anim_${element.id}`,
+          elementId: element.id,
+          type: animConfig.animation as AnimationType,
+          startTime,
+          duration,
+          easing: animConfig.easing as EasingType
+        }
+      }
     }
   }
 
@@ -417,7 +454,9 @@ export const useProjectStore = defineStore('project', () => {
       pngPath: null,
       htmlPath: null,
       audioPath: null,
-      audioDuration: null
+      audioDuration: null,
+      // Animation settings
+      animationsEnabled: true
     }
 
     // Insert at position

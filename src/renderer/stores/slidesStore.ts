@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { useProjectStore } from './projectStore'
-import type { Slide, SlideElement, VisualData, VisualType, LayoutType } from '@shared/types'
+import type { Slide, SlideElement, VisualData, VisualType, LayoutType, ElementAnimation } from '@shared/types'
 
 export const useSlidesStore = defineStore('slides', () => {
   const projectStore = useProjectStore()
@@ -358,6 +358,29 @@ export const useSlidesStore = defineStore('slides', () => {
     }
   }
 
+  // Animation-related methods
+  function updateSlideProperties(updates: Partial<Slide>): void {
+    if (!activeSlide.value) return
+    projectStore.updateSlide(activeSlide.value.slideNum, updates)
+  }
+
+  function updateElementAnimation(elementId: string, animation: ElementAnimation | null): void {
+    if (!activeSlide.value) return
+
+    const element = activeSlide.value.elements.find(e => e.id === elementId)
+    if (element) {
+      projectStore.updateSlideElement(activeSlide.value.slideNum, {
+        ...element,
+        animation
+      })
+    }
+  }
+
+  function setAnimationsEnabled(enabled: boolean): void {
+    if (!activeSlide.value) return
+    projectStore.updateSlide(activeSlide.value.slideNum, { animationsEnabled: enabled })
+  }
+
   return {
     // State
     activeSlideIndex,
@@ -387,6 +410,10 @@ export const useSlidesStore = defineStore('slides', () => {
     setBackground,
     markComplete,
     markPending,
-    saveAndNext
+    saveAndNext,
+    // Animation methods
+    updateSlideProperties,
+    updateElementAnimation,
+    setAnimationsEnabled
   }
 })

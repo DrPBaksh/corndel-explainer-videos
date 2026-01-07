@@ -83,10 +83,11 @@ export interface ElectronAPI {
   generateAudio: (params: { projectId: string; text: string; provider: string; voiceName: string; slideNum: number }) => Promise<{ success: boolean; data?: { path: string; duration: number }; error?: string; cost?: number }>
 
   // Video Generation
-  generateVideo: (projectId: string) => Promise<{ success: boolean; data?: { path: string; duration: number }; error?: string }>
+  generateVideo: (projectId: string, animationOptions?: { animatedSlides: number[]; fps: number }) => Promise<{ success: boolean; data?: { path: string; duration: number }; error?: string }>
 
   // Slide Rendering
   saveSlidePng: (projectId: string, slideNum: number, dataUrl: string) => Promise<{ success: boolean; data?: string; error?: string }>
+  saveSlideFrame: (projectId: string, slideNum: number, frameNum: number, dataUrl: string) => Promise<{ success: boolean; data?: string; error?: string }>
 
   // Video Assembly (Legacy)
   assembleVideo: (slides: SlideVideo[], outputPath: string, options: VideoOptions) => Promise<{ success: boolean; data?: string; error?: string }>

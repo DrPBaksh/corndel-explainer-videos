@@ -180,6 +180,8 @@
       <SlideCanvas
         v-if="currentRenderSlide"
         :slide="currentRenderSlide"
+        :preview-time="currentRenderTime"
+        :show-animations="showAnimations"
       />
     </div>
   </div>
@@ -192,6 +194,7 @@ import { useProjectStore } from '../stores/projectStore'
 import SlideCanvas from '../components/SlideCanvas.vue'
 import html2canvas from 'html2canvas'
 import type { Slide } from '@shared/types'
+import { getTotalAnimationDuration } from '@shared/animationUtils'
 
 const route = useRoute()
 const projectStore = useProjectStore()
@@ -210,6 +213,11 @@ const errorMessage = ref<string | null>(null)
 const slideRenderRef = ref<HTMLDivElement | null>(null)
 const currentRenderSlide = ref<Slide | null>(null)
 const isRendering = ref(false)
+
+// Animation rendering
+const currentRenderTime = ref<number | null>(null)
+const showAnimations = ref(false)
+const ANIMATION_FPS = 30
 
 onMounted(async () => {
   const projectId = route.params.id as string
@@ -272,18 +280,31 @@ function getSlideBackgroundStyle(slide: Slide): Record<string, string> {
   return { backgroundColor: slide.backgroundColor || '#ffffff' }
 }
 
-async function renderSlideToImage(slide: Slide): Promise<string | null> {
-  if (!slideRenderRef.value || !projectStore.project) return null
+// Check if a slide has animations that need frame-by-frame rendering
+function slideHasAnimations(slide: Slide): boolean {
+  if (!slide.animationsEnabled) return false
+  const animations = slide.elements
+    .map(e => e.animation)
+    .filter(a => a && a.type !== 'none')
+  return animations.length > 0
+}
 
-  // Set the slide to render
-  currentRenderSlide.value = slide
-  isRendering.value = true
+// Get the duration to animate (use animation duration or portion of slide)
+function getAnimationRenderDuration(slide: Slide): number {
+  if (!slideHasAnimations(slide)) return 0
 
-  // Wait for Vue to update the DOM
-  await nextTick()
+  const animations = slide.elements
+    .map(e => e.animation)
+    .filter((a): a is NonNullable<typeof a> => a !== null && a !== undefined && a.type !== 'none')
 
-  // Small delay to ensure images are loaded
-  await new Promise(resolve => setTimeout(resolve, 500))
+  const animDuration = getTotalAnimationDuration(animations)
+  // Add a small buffer after animations complete
+  return Math.min(animDuration + 0.5, slide.audioDuration || slide.duration || 5)
+}
+
+// Render a single frame of a slide at a specific time
+async function renderFrame(_slide: Slide, time: number | null): Promise<string | null> {
+  if (!slideRenderRef.value) return null
 
   try {
     // Find the slide canvas element
@@ -302,7 +323,32 @@ async function renderSlideToImage(slide: Slide): Promise<string | null> {
     })
 
     // Convert to data URL
-    const dataUrl = capturedCanvas.toDataURL('image/png')
+    return capturedCanvas.toDataURL('image/png')
+  } catch (error) {
+    console.error(`Error capturing frame at time ${time}:`, error)
+    return null
+  }
+}
+
+// Render a static slide (no animations) as a single PNG
+async function renderSlideToImage(slide: Slide): Promise<string | null> {
+  if (!slideRenderRef.value || !projectStore.project) return null
+
+  // Set the slide to render (no animations)
+  currentRenderSlide.value = slide
+  showAnimations.value = false
+  currentRenderTime.value = null
+  isRendering.value = true
+
+  // Wait for Vue to update the DOM
+  await nextTick()
+
+  // Small delay to ensure images are loaded
+  await new Promise(resolve => setTimeout(resolve, 500))
+
+  try {
+    const dataUrl = await renderFrame(slide, null)
+    if (!dataUrl) return null
 
     // Save to file
     const result = await window.electronAPI.saveSlidePng(
@@ -326,6 +372,87 @@ async function renderSlideToImage(slide: Slide): Promise<string | null> {
   }
 }
 
+// Render an animated slide as multiple frames
+async function renderAnimatedSlide(slide: Slide): Promise<boolean> {
+  if (!slideRenderRef.value || !projectStore.project) return false
+
+  const animDuration = getAnimationRenderDuration(slide)
+  const totalFrames = Math.ceil(animDuration * ANIMATION_FPS)
+
+  console.log(`Rendering animated slide ${slide.slideNum}: ${totalFrames} frames over ${animDuration}s`)
+
+  // Set up for animated rendering
+  currentRenderSlide.value = slide
+  showAnimations.value = true
+  isRendering.value = true
+
+  // Wait for Vue to update the DOM
+  await nextTick()
+
+  // Small delay to ensure images are loaded
+  await new Promise(resolve => setTimeout(resolve, 500))
+
+  try {
+    // Render each frame
+    for (let frameNum = 0; frameNum < totalFrames; frameNum++) {
+      const time = frameNum / ANIMATION_FPS
+      currentRenderTime.value = time
+
+      // Wait for Vue to update animations
+      await nextTick()
+      // Small delay for rendering stability
+      await new Promise(resolve => setTimeout(resolve, 30))
+
+      const dataUrl = await renderFrame(slide, time)
+      if (!dataUrl) {
+        console.error(`Failed to capture frame ${frameNum}`)
+        return false
+      }
+
+      // Save frame
+      const result = await window.electronAPI.saveSlideFrame(
+        projectStore.project!.id,
+        slide.slideNum,
+        frameNum,
+        dataUrl
+      )
+
+      if (!result.success) {
+        console.error(`Failed to save frame ${frameNum}:`, result.error)
+        return false
+      }
+
+      // Update progress text
+      progressText.value = `Rendering slide ${slide.slideNum} - frame ${frameNum + 1}/${totalFrames}`
+    }
+
+    // Also render the final static frame (for the rest of the slide duration)
+    currentRenderTime.value = animDuration
+    await nextTick()
+
+    const finalDataUrl = await renderFrame(slide, animDuration)
+    if (finalDataUrl) {
+      // Save the final frame as the static portion
+      await window.electronAPI.saveSlideFrame(
+        projectStore.project!.id,
+        slide.slideNum,
+        totalFrames, // This will be the "final" frame
+        finalDataUrl
+      )
+    }
+
+    console.log(`Animated slide ${slide.slideNum} rendered successfully`)
+    return true
+  } catch (error) {
+    console.error(`Error rendering animated slide ${slide.slideNum}:`, error)
+    return false
+  } finally {
+    showAnimations.value = false
+    currentRenderTime.value = null
+    isRendering.value = false
+  }
+}
+
 async function generateVideo() {
   if (!projectStore.project || !canGenerate.value) return
 
@@ -337,18 +464,33 @@ async function generateVideo() {
   currentSlideIndex.value = 0
   errorMessage.value = null
 
+  // Track which slides have animations for the backend
+  const animatedSlideNums: number[] = []
+
   try {
-    // First, render all slides to PNG
+    // First, render all slides (static or animated)
     for (let i = 0; i < slides.value.length; i++) {
       const slide = slides.value[i]
       currentSlideIndex.value = i
-      progressText.value = `Rendering slide ${i + 1} of ${slides.value.length}...`
       progress.value = (i / slides.value.length) * 30 // 30% for rendering
 
-      const pngPath = await renderSlideToImage(slide)
-      if (!pngPath) {
-        errorMessage.value = `Failed to render slide ${i + 1}`
-        return
+      if (slideHasAnimations(slide)) {
+        // Render animated slide as multiple frames
+        progressText.value = `Rendering animated slide ${i + 1} of ${slides.value.length}...`
+        const success = await renderAnimatedSlide(slide)
+        if (!success) {
+          errorMessage.value = `Failed to render animated slide ${i + 1}`
+          return
+        }
+        animatedSlideNums.push(slide.slideNum)
+      } else {
+        // Render static slide as single PNG
+        progressText.value = `Rendering slide ${i + 1} of ${slides.value.length}...`
+        const pngPath = await renderSlideToImage(slide)
+        if (!pngPath) {
+          errorMessage.value = `Failed to render slide ${i + 1}`
+          return
+        }
       }
       generatedSlides.value.push(i)
     }
@@ -356,8 +498,11 @@ async function generateVideo() {
     progressText.value = 'Assembling video...'
     progress.value = 35
 
-    // Now generate the video
-    const result = await window.electronAPI.generateVideo(projectStore.project.id)
+    // Now generate the video (pass info about animated slides)
+    const result = await window.electronAPI.generateVideo(
+      projectStore.project.id,
+      animatedSlideNums.length > 0 ? { animatedSlides: animatedSlideNums, fps: ANIMATION_FPS } : undefined
+    )
     console.log('generateVideo result:', result)
 
     if (result.success && result.data) {

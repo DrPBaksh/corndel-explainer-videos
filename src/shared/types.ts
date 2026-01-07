@@ -88,6 +88,9 @@ export interface SlideStrategy {
 
   // Narration
   narration: string
+
+  // Animation plan (AI-generated)
+  animationPlan?: AnimationPlan
 }
 
 export type SlideType = 'intro' | 'main' | 'end'
@@ -161,6 +164,11 @@ export interface Slide {
   // Audio
   audioPath: string | null
   audioDuration: number | null
+
+  // Animation settings
+  animationsEnabled: boolean
+  animationPlan?: AnimationPlan         // Resolved animation plan for this slide
+  transition?: SlideTransition          // Transition to next slide
 }
 
 export type SlideStatus = 'pending' | 'editing' | 'complete'
@@ -182,6 +190,8 @@ export interface SlideElement {
   fontWeight?: string
   color?: string
   textAlign?: 'left' | 'center' | 'right'
+  // Animation for this element
+  animation?: ElementAnimation | null
 }
 
 export type ElementType = 'headline' | 'subheadline' | 'body' | 'bullets' | 'image'
@@ -263,6 +273,73 @@ export interface TTSOptions {
   voice: string
   speed: number
   model?: string                      // 'tts-1-hd' for OpenAI
+}
+
+// ============================================
+// ANIMATIONS
+// ============================================
+
+export type AnimationType =
+  | 'none'
+  | 'fade-in'
+  | 'fade-out'
+  | 'slide-left'
+  | 'slide-right'
+  | 'slide-up'
+  | 'slide-down'
+  | 'scale-in'
+  | 'scale-out'
+  | 'typewriter'
+  | 'bounce'
+  | 'zoom-in'
+  // Emphasis animations
+  | 'highlight'
+  | 'glow-pulse'
+  | 'shake'
+  | 'wobble'
+  | 'pop'
+  // Draw animations
+  | 'underline-draw'
+  | 'circle-draw'
+
+export type EasingType =
+  | 'linear'
+  | 'ease-in'
+  | 'ease-out'
+  | 'ease-in-out'
+  | 'bounce'
+  | 'elastic'
+
+export interface ElementAnimation {
+  id: string
+  elementId: string
+  type: AnimationType
+  startTime: number                    // Seconds from slide start
+  duration: number                     // Animation duration in seconds
+  easing: EasingType
+  delay?: number                       // Optional delay before animation starts
+  // Animation-specific options
+  distance?: number                    // For slide animations (percentage)
+  highlightColor?: string              // For highlight animation
+  intensity?: 'light' | 'medium' | 'strong'  // For shake/wobble
+}
+
+export interface SlideTransition {
+  type: 'cut' | 'fade' | 'dissolve' | 'slide-left' | 'slide-right' | 'wipe' | 'zoom'
+  duration: number                     // Transition duration in seconds
+}
+
+export interface AnimationPlan {
+  elementAnimations: Array<{
+    elementType: ElementType
+    animation: AnimationType
+    relativeStartPercent: number       // 0-100 percent into slide duration
+    durationPercent: number            // Percent of slide duration
+    easing: EasingType
+  }>
+  staggerDelay?: number                // Delay between sequential elements (seconds)
+  totalBuildTime?: number              // How long all animations take
+  transition?: SlideTransition         // Transition to next slide
 }
 
 // ============================================

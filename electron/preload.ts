@@ -131,8 +131,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // ============================================
   // VIDEO GENERATION
   // ============================================
-  generateVideo: (projectId: string): Promise<{ success: boolean; data?: { path: string; duration: number }; error?: string }> =>
-    ipcRenderer.invoke('generate-video', projectId),
+  generateVideo: (projectId: string, animationOptions?: { animatedSlides: number[]; fps: number }): Promise<{ success: boolean; data?: { path: string; duration: number }; error?: string }> =>
+    ipcRenderer.invoke('generate-video', projectId, animationOptions),
 
   // Legacy - VIDEO ASSEMBLY
   assembleVideo: (slides: SlideVideo[], outputPath: string, options: VideoOptions): Promise<{ success: boolean; data?: string; error?: string }> =>
@@ -143,6 +143,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // ============================================
   saveSlidePng: (projectId: string, slideNum: number, dataUrl: string): Promise<{ success: boolean; data?: string; error?: string }> =>
     ipcRenderer.invoke('save-slide-png', projectId, slideNum, dataUrl),
+
+  saveSlideFrame: (projectId: string, slideNum: number, frameNum: number, dataUrl: string): Promise<{ success: boolean; data?: string; error?: string }> =>
+    ipcRenderer.invoke('save-slide-frame', projectId, slideNum, frameNum, dataUrl),
 
   // ============================================
   // FILE DIALOGS

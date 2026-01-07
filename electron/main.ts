@@ -357,6 +357,7 @@ For each slide, specify:
 2. Visual type: Must be one of: "pexels", "gemini", "diagram", "chart", "code", "table", "none"
 3. Text content: headline, subheadline (optional), bodyText (optional), bullets (optional array)
 4. Narration: voiceover script for this slide
+5. Animation plan: How elements should animate in, synchronized with narration
 
 Visual type guidance:
 - "pexels": Stock photos - provide pexelsKeywords for search
@@ -364,6 +365,33 @@ Visual type guidance:
 - "diagram": For flowcharts, processes - provide diagramDescription
 - "chart": For data visualizations - will use Chart.js
 - "none": Text-only slide (use for intro/outro)
+
+ANIMATION PLANNING GUIDANCE:
+- Elements should animate in sequence, building the slide professionally
+- Headline: Typically appears first using "fade-in" or "slide-down", 0.5s duration
+- Subheadline: Follows headline with 0.3-0.5s delay
+- Body text: Can use "fade-in" or "typewriter" for emphasis
+- Bullets: MUST stagger - each bullet animates separately with 0.15-0.2s between them
+- Images: Use "scale-in", "zoom-in", or "fade-in" when narration mentions the visual
+- Keep total animation build time under 40% of slide duration
+- Time animations to coincide with when the narrator mentions that content
+
+Animation types available:
+- "fade-in": Opacity 0 to 1 (default, works everywhere)
+- "slide-left": Enter from right side
+- "slide-right": Enter from left side
+- "slide-up": Enter from bottom
+- "slide-down": Enter from top
+- "scale-in": Scale from 0 to 1 with fade
+- "zoom-in": Scale from 0.5 to 1
+- "typewriter": Characters appear one by one (great for quotes/key text)
+- "bounce": Scale with playful overshoot
+- "pop": Quick scale pulse for emphasis
+- "highlight": Yellow marker sweep across text
+- "shake": Horizontal shake for warnings/emphasis
+- "wobble": Rotation oscillation for playful emphasis
+
+Easings: "ease-out" (default, recommended), "ease-in-out", "bounce", "elastic"
 
 Return a JSON object with this structure:
 {
@@ -387,7 +415,23 @@ Return a JSON object with this structure:
       "geminiPrompt": "detailed AI image prompt" or null,
       "diagramDescription": "diagram description" or null,
       "layout": "text-left-image-right",
-      "narration": "voiceover script for this slide"
+      "narration": "voiceover script for this slide",
+      "animationPlan": {
+        "elementAnimations": [
+          {
+            "elementType": "headline" | "subheadline" | "body" | "bullets" | "image",
+            "animation": "fade-in" | "slide-left" | "slide-up" | etc.,
+            "relativeStartPercent": 0-100 (when in slide duration to start),
+            "durationPercent": 5-20 (percent of slide duration),
+            "easing": "ease-out"
+          }
+        ],
+        "staggerDelay": 0.15 (seconds between staggered items like bullets),
+        "transition": {
+          "type": "fade" | "dissolve" | "slide-left" | "cut",
+          "duration": 0.3
+        }
+      }
     }
   ]
 }`
@@ -1554,10 +1598,16 @@ ipcMain.handle('generate-audio', async (_event, params: AudioGenerationParams): 
 // VIDEO GENERATION (Simplified - takes projectId)
 // ============================================
 
-ipcMain.handle('generate-video', async (_event, projectId: string): Promise<{ success: boolean; data?: { path: string; duration: number }; error?: string }> => {
+interface AnimationOptions {
+  animatedSlides: number[]  // Slide numbers that have animations
+  fps: number               // Frames per second for animation
+}
+
+ipcMain.handle('generate-video', async (_event, projectId: string, animationOptions?: AnimationOptions): Promise<{ success: boolean; data?: { path: string; duration: number }; error?: string }> => {
   try {
     console.log('=== generate-video called ===')
     console.log('Project ID:', projectId)
+    console.log('Animation options:', animationOptions)
 
     // Load project
     const projectDir = join(app.getPath('userData'), 'projects', projectId)
@@ -1604,63 +1654,182 @@ ipcMain.handle('generate-video', async (_event, projectId: string): Promise<{ su
       })
 
       const slideVideoPath = join(tempDir, `slide_${i.toString().padStart(3, '0')}.mp4`)
-
-      // Look for rendered PNG first (created by frontend)
-      const renderedPngPath = join(projectDir, 'slides', `slide_${slide.slideNum.toString().padStart(3, '0')}.png`)
-
-      let imageInput: string
-      let inputOptions: string[] = ['-loop', '1']
-
-      if (existsSync(renderedPngPath)) {
-        imageInput = renderedPngPath
-        console.log(`  Using rendered PNG: ${renderedPngPath}`)
-      } else {
-        // Fallback: Check for visual image
-        const visualPath = slide.visualData?.imagePath
-        if (visualPath && existsSync(visualPath)) {
-          imageInput = visualPath
-          console.log(`  Using visual image: ${visualPath}`)
-        } else if (slide.backgroundType === 'image' && slide.backgroundImagePath && existsSync(slide.backgroundImagePath)) {
-          imageInput = slide.backgroundImagePath
-          console.log(`  Using background image: ${slide.backgroundImagePath}`)
-        } else {
-          // Create a solid color image using ffmpeg
-          const bgColor = slide.backgroundColor || '#1a1a2e'
-          imageInput = `color=c=${bgColor.replace('#', '')}:s=${width}x${height}:d=1`
-          inputOptions = ['-f', 'lavfi']
-          console.log(`  Using solid color: ${bgColor}`)
-        }
-      }
-
       const duration = slide.audioDuration || slide.duration || 5
 
-      await new Promise<void>((resolve, reject) => {
-        const cmd = ffmpeg()
-          .input(imageInput)
-          .inputOptions(inputOptions)
-          .input(slide.audioPath!)
-          .outputOptions([
-            '-c:v', 'libx264',
-            '-tune', 'stillimage',
-            '-c:a', 'aac',
-            '-b:a', '192k',
-            '-pix_fmt', 'yuv420p',
-            '-shortest',
-            '-t', duration.toString(),
-            '-vf', `scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2`
-          ])
-          .output(slideVideoPath)
-          .on('end', () => {
-            console.log(`  Slide ${i + 1} video created`)
-            resolve()
-          })
-          .on('error', (err: Error) => {
-            console.error(`  Error creating slide ${i + 1}:`, err)
-            reject(err)
+      // Check if this is an animated slide
+      const isAnimatedSlide = animationOptions?.animatedSlides.includes(slide.slideNum)
+      const framesDir = join(projectDir, 'slides', `slide_${slide.slideNum.toString().padStart(3, '0')}_frames`)
+
+      if (isAnimatedSlide && existsSync(framesDir)) {
+        // Animated slide: Create video from frames
+        console.log(`  Processing animated slide ${slide.slideNum} from frames`)
+
+        const fps = animationOptions?.fps || 30
+        const framePattern = join(framesDir, 'frame_%05d.png')
+
+        // Count frames to calculate animation duration
+        const frames = readdirSync(framesDir).filter(f => f.startsWith('frame_') && f.endsWith('.png'))
+        const animationDuration = frames.length / fps
+        const staticDuration = Math.max(0, duration - animationDuration)
+
+        console.log(`  Animation: ${frames.length} frames, ${animationDuration.toFixed(2)}s animation, ${staticDuration.toFixed(2)}s static`)
+
+        if (staticDuration > 0.1) {
+          // Need to create animation segment + static segment
+          const animVideoPath = join(tempDir, `slide_${i.toString().padStart(3, '0')}_anim.mp4`)
+          const staticVideoPath = join(tempDir, `slide_${i.toString().padStart(3, '0')}_static.mp4`)
+
+          // Create animated portion (no audio yet)
+          await new Promise<void>((resolve, reject) => {
+            ffmpeg()
+              .input(framePattern)
+              .inputOptions(['-framerate', fps.toString()])
+              .outputOptions([
+                '-c:v', 'libx264',
+                '-pix_fmt', 'yuv420p',
+                '-vf', `scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2`
+              ])
+              .output(animVideoPath)
+              .on('end', () => resolve())
+              .on('error', (err: Error) => reject(err))
+              .run()
           })
 
-        cmd.run()
-      })
+          // Get the last frame for static portion
+          const lastFramePath = join(framesDir, frames.sort().pop()!)
+
+          // Create static portion
+          await new Promise<void>((resolve, reject) => {
+            ffmpeg()
+              .input(lastFramePath)
+              .inputOptions(['-loop', '1'])
+              .outputOptions([
+                '-c:v', 'libx264',
+                '-t', staticDuration.toString(),
+                '-pix_fmt', 'yuv420p',
+                '-vf', `scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2`
+              ])
+              .output(staticVideoPath)
+              .on('end', () => resolve())
+              .on('error', (err: Error) => reject(err))
+              .run()
+          })
+
+          // Concatenate animated + static segments
+          const segmentListPath = join(tempDir, `slide_${i}_segments.txt`)
+          writeFileSync(segmentListPath, `file '${animVideoPath.replace(/\\/g, '/')}'\nfile '${staticVideoPath.replace(/\\/g, '/')}'`)
+
+          const combinedVideoPath = join(tempDir, `slide_${i.toString().padStart(3, '0')}_combined.mp4`)
+          await new Promise<void>((resolve, reject) => {
+            ffmpeg()
+              .input(segmentListPath)
+              .inputOptions(['-f', 'concat', '-safe', '0'])
+              .outputOptions(['-c', 'copy'])
+              .output(combinedVideoPath)
+              .on('end', () => resolve())
+              .on('error', (err: Error) => reject(err))
+              .run()
+          })
+
+          // Add audio to combined video
+          await new Promise<void>((resolve, reject) => {
+            ffmpeg()
+              .input(combinedVideoPath)
+              .input(slide.audioPath!)
+              .outputOptions([
+                '-c:v', 'copy',
+                '-c:a', 'aac',
+                '-b:a', '192k',
+                '-shortest'
+              ])
+              .output(slideVideoPath)
+              .on('end', () => {
+                console.log(`  Animated slide ${i + 1} video created`)
+                resolve()
+              })
+              .on('error', (err: Error) => reject(err))
+              .run()
+          })
+        } else {
+          // Animation fills entire slide duration
+          await new Promise<void>((resolve, reject) => {
+            ffmpeg()
+              .input(framePattern)
+              .inputOptions(['-framerate', fps.toString()])
+              .input(slide.audioPath!)
+              .outputOptions([
+                '-c:v', 'libx264',
+                '-c:a', 'aac',
+                '-b:a', '192k',
+                '-pix_fmt', 'yuv420p',
+                '-shortest',
+                '-vf', `scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2`
+              ])
+              .output(slideVideoPath)
+              .on('end', () => {
+                console.log(`  Animated slide ${i + 1} video created`)
+                resolve()
+              })
+              .on('error', (err: Error) => reject(err))
+              .run()
+          })
+        }
+      } else {
+        // Static slide: Use existing single PNG approach
+        const renderedPngPath = join(projectDir, 'slides', `slide_${slide.slideNum.toString().padStart(3, '0')}.png`)
+
+        let imageInput: string
+        let inputOptions: string[] = ['-loop', '1']
+
+        if (existsSync(renderedPngPath)) {
+          imageInput = renderedPngPath
+          console.log(`  Using rendered PNG: ${renderedPngPath}`)
+        } else {
+          // Fallback: Check for visual image
+          const visualPath = slide.visualData?.imagePath
+          if (visualPath && existsSync(visualPath)) {
+            imageInput = visualPath
+            console.log(`  Using visual image: ${visualPath}`)
+          } else if (slide.backgroundType === 'image' && slide.backgroundImagePath && existsSync(slide.backgroundImagePath)) {
+            imageInput = slide.backgroundImagePath
+            console.log(`  Using background image: ${slide.backgroundImagePath}`)
+          } else {
+            // Create a solid color image using ffmpeg
+            const bgColor = slide.backgroundColor || '#1a1a2e'
+            imageInput = `color=c=${bgColor.replace('#', '')}:s=${width}x${height}:d=1`
+            inputOptions = ['-f', 'lavfi']
+            console.log(`  Using solid color: ${bgColor}`)
+          }
+        }
+
+        await new Promise<void>((resolve, reject) => {
+          const cmd = ffmpeg()
+            .input(imageInput)
+            .inputOptions(inputOptions)
+            .input(slide.audioPath!)
+            .outputOptions([
+              '-c:v', 'libx264',
+              '-tune', 'stillimage',
+              '-c:a', 'aac',
+              '-b:a', '192k',
+              '-pix_fmt', 'yuv420p',
+              '-shortest',
+              '-t', duration.toString(),
+              '-vf', `scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2`
+            ])
+            .output(slideVideoPath)
+            .on('end', () => {
+              console.log(`  Slide ${i + 1} video created`)
+              resolve()
+            })
+            .on('error', (err: Error) => {
+              console.error(`  Error creating slide ${i + 1}:`, err)
+              reject(err)
+            })
+
+          cmd.run()
+        })
+      }
 
       slideVideos.push(slideVideoPath)
     }
@@ -1865,6 +2034,28 @@ ipcMain.handle('save-slide-png', async (_event, projectId: string, slideNum: num
     return { success: true, data: pngPath }
   } catch (e: any) {
     console.error('Error saving slide PNG:', e)
+    return { success: false, error: e.message }
+  }
+})
+
+// Save individual animation frame for animated slides
+ipcMain.handle('save-slide-frame', async (_event, projectId: string, slideNum: number, frameNum: number, dataUrl: string): Promise<{ success: boolean; data?: string; error?: string }> => {
+  try {
+    const projectDir = join(app.getPath('userData'), 'projects', projectId)
+    const framesDir = join(projectDir, 'slides', `slide_${slideNum.toString().padStart(3, '0')}_frames`)
+    mkdirSync(framesDir, { recursive: true })
+
+    const framePath = join(framesDir, `frame_${frameNum.toString().padStart(5, '0')}.png`)
+
+    // Convert data URL to buffer and save
+    const base64Data = dataUrl.replace(/^data:image\/png;base64,/, '')
+    const buffer = Buffer.from(base64Data, 'base64')
+    writeFileSync(framePath, buffer)
+
+    console.log(`Saved slide ${slideNum} frame ${frameNum} to:`, framePath)
+    return { success: true, data: framePath }
+  } catch (e: any) {
+    console.error('Error saving slide frame:', e)
     return { success: false, error: e.message }
   }
 })

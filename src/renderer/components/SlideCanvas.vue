@@ -25,17 +25,17 @@
     >
       <!-- Text elements -->
       <div v-if="element.type === 'headline'" class="text-content headline">
-        {{ element.content || 'Headline' }}
+        {{ getVisibleContent(element) || 'Headline' }}
       </div>
       <div v-else-if="element.type === 'subheadline'" class="text-content subheadline">
-        {{ element.content || 'Subheadline' }}
+        {{ getVisibleContent(element) || 'Subheadline' }}
       </div>
       <div v-else-if="element.type === 'body'" class="text-content body">
-        {{ element.content || 'Body text' }}
+        {{ getVisibleContent(element) || 'Body text' }}
       </div>
       <div v-else-if="element.type === 'bullets'" class="text-content bullets">
         <ul class="list-disc list-inside space-y-1">
-          <li v-for="(bullet, i) in getBullets(element.content)" :key="i">{{ bullet }}</li>
+          <li v-for="(bullet, i) in getBulletsAnimated(element)" :key="i">{{ bullet }}</li>
         </ul>
       </div>
 
@@ -81,9 +81,12 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import type { Slide, SlideElement } from '@shared/types'
+import { calculateAnimationState, getAnimationCSSTransform, type AnimationState } from '@shared/animationUtils'
 
 const props = defineProps<{
   slide: Slide
+  previewTime?: number | null    // Current time in preview (seconds)
+  showAnimations?: boolean       // Whether to apply animation states
 }>()
 
 const emit = defineEmits<{
@@ -132,22 +135,105 @@ const backgroundStyle = computed(() => {
   }
 })
 
+// Compute animation states for all elements when in preview mode
+const animationStates = computed<Record<string, AnimationState>>(() => {
+  if (!props.showAnimations || props.previewTime === null || props.previewTime === undefined) {
+    return {}
+  }
+
+  const states: Record<string, AnimationState> = {}
+  for (const element of props.slide.elements) {
+    if (element.animation && props.slide.animationsEnabled) {
+      states[element.id] = calculateAnimationState(
+        element.animation,
+        props.previewTime,
+        element.content || undefined
+      )
+    }
+  }
+  return states
+})
+
 function getElementStyle(element: SlideElement): Record<string, string> {
-  return {
+  const baseStyle: Record<string, string> = {
     left: `${element.x}%`,
     top: `${element.y}%`,
     width: `${element.width}%`,
     height: `${element.height}%`,
-    fontSize: element.fontSize ? `${element.fontSize}px` : undefined,
-    fontWeight: element.fontWeight || undefined,
+    fontSize: element.fontSize ? `${element.fontSize}px` : undefined as any,
+    fontWeight: element.fontWeight || undefined as any,
     color: element.color || '#1f2937',
     textAlign: element.textAlign || 'left'
-  } as Record<string, string>
+  }
+
+  // Apply animation state if in preview mode
+  const animState = animationStates.value[element.id]
+  if (animState && props.showAnimations) {
+    baseStyle.opacity = animState.opacity.toString()
+    baseStyle.transform = getAnimationCSSTransform(animState)
+    baseStyle.transition = 'none'  // Disable CSS transitions during programmatic animation
+
+    // Apply highlight effect
+    if (animState.highlightOpacity !== undefined && animState.highlightOpacity > 0) {
+      const highlightColor = element.animation?.highlightColor || '#ffeb3b'
+      const alpha = Math.round(animState.highlightOpacity * 0.5 * 255).toString(16).padStart(2, '0')
+      baseStyle.backgroundColor = `${highlightColor}${alpha}`
+    }
+
+    // Apply glow effect
+    if (animState.glowIntensity !== undefined && animState.glowIntensity > 0) {
+      const glowSize = Math.round(animState.glowIntensity * 20)
+      baseStyle.boxShadow = `0 0 ${glowSize}px ${glowSize / 2}px rgba(99, 102, 241, ${animState.glowIntensity * 0.6})`
+    }
+  }
+
+  return baseStyle
 }
 
-function getBullets(content: string | null): string[] {
+// Get visible text content for typewriter effect
+function getVisibleContent(element: SlideElement): string {
+  const content = element.content || ''
+  const animState = animationStates.value[element.id]
+
+  if (animState?.visibleChars !== undefined && props.showAnimations) {
+    return content.substring(0, animState.visibleChars)
+  }
+
+  return content
+}
+
+// Get bullets with typewriter animation applied
+function getBulletsAnimated(element: SlideElement): string[] {
+  const content = element.content
   if (!content) return ['Bullet point']
-  return content.split('\n').filter(b => b.trim())
+
+  const bullets = content.split('\n').filter(b => b.trim())
+  const animState = animationStates.value[element.id]
+
+  if (animState?.visibleChars !== undefined && props.showAnimations) {
+    // Calculate how many characters are visible
+    let totalChars = 0
+    const visibleBullets: string[] = []
+
+    for (const bullet of bullets) {
+      if (totalChars >= animState.visibleChars) {
+        break  // No more visible characters
+      }
+
+      const remainingChars = animState.visibleChars - totalChars
+      if (remainingChars >= bullet.length) {
+        visibleBullets.push(bullet)
+        totalChars += bullet.length + 1  // +1 for newline
+      } else {
+        visibleBullets.push(bullet.substring(0, remainingChars))
+        break
+      }
+    }
+
+    return visibleBullets.length > 0 ? visibleBullets : ['']
+  }
+
+  return bullets
 }
 
 function getImageStyle(element: SlideElement): Record<string, string> {
