@@ -347,6 +347,12 @@ function buildContentSystemPrompt(config: ProjectConfig): string {
 
 Your task is to create a complete content strategy for an explainer video in JSON format.
 
+LANGUAGE REQUIREMENTS:
+- Use British English spellings throughout (e.g., "colour" not "color", "organise" not "organize", "centre" not "center")
+- Write in clear, professional English suitable for corporate training content
+- Avoid American idioms or colloquialisms
+- Use formal but accessible language appropriate for professional audiences
+
 REQUIREMENTS:
 - Create ${config.numSlides === 'flexible' ? '5-7' : config.numSlides} slides (1 intro + main slides + 1 end)
 - Total duration: ${config.targetDuration} seconds
@@ -538,6 +544,12 @@ ipcMain.handle('regenerate-slide', async (_event, params: RegenerateSlideParams)
     const systemPrompt = `You are an expert explainer video content strategist regenerating a single slide.
 
 Your task is to regenerate specific fields for slide ${params.slideNum + 1} of an explainer video.
+
+LANGUAGE REQUIREMENTS:
+- Use British English spellings throughout (e.g., "colour" not "color", "organise" not "organize", "centre" not "center")
+- Write in clear, professional English suitable for corporate training content
+- Avoid American idioms or colloquialisms
+- Use formal but accessible language appropriate for professional audiences
 
 AVAILABLE LAYOUTS: "text-left-image-right", "text-right-image-left", "center", "text-top-image-bottom", "full-visual", "split-50-50"
 
