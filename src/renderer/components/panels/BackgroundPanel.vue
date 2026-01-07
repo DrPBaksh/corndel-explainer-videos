@@ -55,9 +55,14 @@
           ></button>
         </div>
 
-        <button @click="applySolid" class="btn-primary w-full">
-          Apply Color
-        </button>
+        <div class="flex gap-2">
+          <button @click="applySolid" class="btn-primary flex-1">
+            Apply
+          </button>
+          <button @click="applySolidToAll" class="btn-secondary flex-1">
+            Apply to All
+          </button>
+        </div>
       </div>
 
       <!-- Gradient -->
@@ -110,9 +115,14 @@
           ></button>
         </div>
 
-        <button @click="applyGradient" class="btn-primary w-full">
-          Apply Gradient
-        </button>
+        <div class="flex gap-2">
+          <button @click="applyGradient" class="btn-primary flex-1">
+            Apply
+          </button>
+          <button @click="applyGradientToAll" class="btn-secondary flex-1">
+            Apply to All
+          </button>
+        </div>
       </div>
 
       <!-- Image Background -->
@@ -222,12 +232,20 @@
               />
             </div>
           </div>
-          <button
-            @click="bgOffsetX = 0; bgOffsetY = 0; applyImageSettings()"
-            class="btn-secondary text-xs w-full"
-          >
-            Reset Offsets
-          </button>
+          <div class="flex gap-2">
+            <button
+              @click="bgOffsetX = 0; bgOffsetY = 0; applyImageSettings()"
+              class="btn-secondary text-xs flex-1"
+            >
+              Reset Offsets
+            </button>
+            <button
+              @click="applyImageToAll"
+              class="btn-primary text-xs flex-1"
+            >
+              Apply to All Slides
+            </button>
+          </div>
         </div>
 
         <button @click="selectBackgroundImage" class="btn-secondary w-full">
@@ -273,6 +291,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   'update-background': [type: 'solid' | 'gradient' | 'image', value: string, options?: { size?: string; position?: string }]
+  'apply-to-all': [type: 'solid' | 'gradient' | 'image', value: string, options?: { size?: string; position?: string }]
 }>()
 
 interface ReferenceImage {
@@ -414,12 +433,39 @@ function applySolid() {
   emit('update-background', 'solid', solidColor.value)
 }
 
+function applySolidToAll() {
+  emit('apply-to-all', 'solid', solidColor.value)
+}
+
 function applyGradient() {
   emit('update-background', 'gradient', gradientPreview.value)
 }
 
+function applyGradientToAll() {
+  emit('apply-to-all', 'gradient', gradientPreview.value)
+}
+
 function applyGradientPreset(preset: { name: string; value: string }) {
   emit('update-background', 'gradient', preset.value)
+}
+
+function applyImageToAll() {
+  if (props.slide?.backgroundImagePath) {
+    let position = bgPosition.value
+    if (bgOffsetX.value !== 0 || bgOffsetY.value !== 0) {
+      const posMap: Record<string, [number, number]> = {
+        'top left': [0, 0], 'top center': [50, 0], 'top right': [100, 0],
+        'center left': [0, 50], 'center': [50, 50], 'center right': [100, 50],
+        'bottom left': [0, 100], 'bottom center': [50, 100], 'bottom right': [100, 100]
+      }
+      const [baseX, baseY] = posMap[bgPosition.value] || [50, 50]
+      position = `${baseX + bgOffsetX.value}% ${baseY + bgOffsetY.value}%`
+    }
+    emit('apply-to-all', 'image', props.slide.backgroundImagePath, {
+      size: bgSize.value,
+      position
+    })
+  }
 }
 
 function applyImageSettings() {

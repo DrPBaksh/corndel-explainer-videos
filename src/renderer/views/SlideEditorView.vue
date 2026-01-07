@@ -190,6 +190,7 @@
           v-if="activePanel === 'background'"
           :slide="slidesStore.activeSlide"
           @update-background="handleBackgroundUpdate"
+          @apply-to-all="handleBackgroundApplyToAll"
         />
 
         <!-- Narration Panel -->
@@ -343,6 +344,36 @@ function handleVisualUpdate(visualData: VisualData) {
 
 function handleBackgroundUpdate(type: 'solid' | 'gradient' | 'image', value: string, options?: { size?: string; position?: string }) {
   slidesStore.setBackground(type, value, options)
+}
+
+function handleBackgroundApplyToAll(type: 'solid' | 'gradient' | 'image', value: string, options?: { size?: string; position?: string }) {
+  // Apply background to all slides
+  const slides = slidesStore.slides
+  for (const slide of slides) {
+    const updates: Partial<Slide> = { backgroundType: type }
+
+    if (type === 'solid') {
+      updates.backgroundColor = value
+      updates.backgroundGradient = null
+      updates.backgroundImagePath = null
+      updates.backgroundSize = null
+      updates.backgroundPosition = null
+    } else if (type === 'gradient') {
+      updates.backgroundColor = null
+      updates.backgroundGradient = value
+      updates.backgroundImagePath = null
+      updates.backgroundSize = null
+      updates.backgroundPosition = null
+    } else if (type === 'image') {
+      updates.backgroundColor = null
+      updates.backgroundGradient = null
+      updates.backgroundImagePath = value
+      updates.backgroundSize = options?.size || 'cover'
+      updates.backgroundPosition = options?.position || 'center'
+    }
+
+    projectStore.updateSlide(slide.slideNum, updates)
+  }
 }
 
 function handleNarrationUpdate(narration: string) {
