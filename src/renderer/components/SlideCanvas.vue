@@ -355,7 +355,7 @@ watch(() => props.slide.slideNum, () => {
 .text-content {
   width: 100%;
   height: 100%;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .headline {

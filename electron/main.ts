@@ -1666,7 +1666,9 @@ ipcMain.handle('generate-video', async (_event, projectId: string, animationOpti
       })
 
       const slideVideoPath = join(tempDir, `slide_${i.toString().padStart(3, '0')}.mp4`)
-      const duration = slide.audioDuration || slide.duration || 5
+      const audioDelay = slide.audioDelay ?? 0.5  // Default 0.5s delay to let animations complete
+      const baseDuration = slide.audioDuration || slide.duration || 5
+      const duration = baseDuration + audioDelay  // Extend video to account for audio delay
 
       // Check if this is an animated slide
       const isAnimatedSlide = animationOptions?.animatedSlides.includes(slide.slideNum)
@@ -1743,11 +1745,12 @@ ipcMain.handle('generate-video', async (_event, projectId: string, animationOpti
               .run()
           })
 
-          // Add audio to combined video
+          // Add audio to combined video (with delay to let animations complete)
           await new Promise<void>((resolve, reject) => {
             ffmpeg()
               .input(combinedVideoPath)
               .input(slide.audioPath!)
+              .inputOptions(['-itsoffset', audioDelay.toString()])  // Delay audio start
               .outputOptions([
                 '-c:v', 'copy',
                 '-c:a', 'aac',
@@ -1756,7 +1759,7 @@ ipcMain.handle('generate-video', async (_event, projectId: string, animationOpti
               ])
               .output(slideVideoPath)
               .on('end', () => {
-                console.log(`  Animated slide ${i + 1} video created`)
+                console.log(`  Animated slide ${i + 1} video created (audio delay: ${audioDelay}s)`)
                 resolve()
               })
               .on('error', (err: Error) => reject(err))
@@ -1769,6 +1772,7 @@ ipcMain.handle('generate-video', async (_event, projectId: string, animationOpti
               .input(framePattern)
               .inputOptions(['-framerate', fps.toString()])
               .input(slide.audioPath!)
+              .inputOptions(['-itsoffset', audioDelay.toString()])  // Delay audio start
               .outputOptions([
                 '-c:v', 'libx264',
                 '-c:a', 'aac',
@@ -1779,7 +1783,7 @@ ipcMain.handle('generate-video', async (_event, projectId: string, animationOpti
               ])
               .output(slideVideoPath)
               .on('end', () => {
-                console.log(`  Animated slide ${i + 1} video created`)
+                console.log(`  Animated slide ${i + 1} video created (audio delay: ${audioDelay}s)`)
                 resolve()
               })
               .on('error', (err: Error) => reject(err))
@@ -1819,6 +1823,7 @@ ipcMain.handle('generate-video', async (_event, projectId: string, animationOpti
             .input(imageInput)
             .inputOptions(inputOptions)
             .input(slide.audioPath!)
+            .inputOptions(['-itsoffset', audioDelay.toString()])  // Delay audio start
             .outputOptions([
               '-c:v', 'libx264',
               '-tune', 'stillimage',
@@ -1831,7 +1836,7 @@ ipcMain.handle('generate-video', async (_event, projectId: string, animationOpti
             ])
             .output(slideVideoPath)
             .on('end', () => {
-              console.log(`  Slide ${i + 1} video created`)
+              console.log(`  Slide ${i + 1} video created (audio delay: ${audioDelay}s)`)
               resolve()
             })
             .on('error', (err: Error) => {

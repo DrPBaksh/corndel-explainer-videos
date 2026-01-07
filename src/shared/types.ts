@@ -164,6 +164,7 @@ export interface Slide {
   // Audio
   audioPath: string | null
   audioDuration: number | null
+  audioDelay: number | null         // Delay before audio starts (allows animations to complete)
 
   // Animation settings
   animationsEnabled: boolean

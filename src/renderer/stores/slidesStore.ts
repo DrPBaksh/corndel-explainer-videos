@@ -90,7 +90,7 @@ export const useSlidesStore = defineStore('slides', () => {
           x: 5,
           y: 5,
           width: 45,
-          height: 15,
+          height: 18,
           zIndex: 10,
           content: updates.headline,
           imagePath: null,
@@ -119,9 +119,9 @@ export const useSlidesStore = defineStore('slides', () => {
           id: `subheadline_${activeSlide.value.slideNum}_${Date.now()}`,
           type: 'subheadline' as const,
           x: 5,
-          y: 20,
+          y: 23,
           width: 45,
-          height: 10,
+          height: 12,
           zIndex: 9,
           content: updates.subheadline,
           imagePath: null,
@@ -150,9 +150,9 @@ export const useSlidesStore = defineStore('slides', () => {
           id: `body_${activeSlide.value.slideNum}_${Date.now()}`,
           type: 'body' as const,
           x: 5,
-          y: 32,
+          y: 35,
           width: 45,
-          height: 20,
+          height: 25,
           zIndex: 8,
           content: updates.bodyText,
           imagePath: null,
@@ -182,9 +182,9 @@ export const useSlidesStore = defineStore('slides', () => {
           id: `bullets_${activeSlide.value.slideNum}_${Date.now()}`,
           type: 'bullets' as const,
           x: 5,
-          y: 55,
+          y: 60,
           width: 45,
-          height: 35,
+          height: 40,
           zIndex: 7,
           content: updates.bullets!.join('\n'),
           imagePath: null,
@@ -381,6 +381,13 @@ export const useSlidesStore = defineStore('slides', () => {
     projectStore.updateSlide(activeSlide.value.slideNum, { animationsEnabled: enabled })
   }
 
+  function setAudioDelay(delay: number): void {
+    if (!activeSlide.value) return
+    // Clamp delay between 0 and 2 seconds
+    const clampedDelay = Math.max(0, Math.min(2, delay))
+    projectStore.updateSlide(activeSlide.value.slideNum, { audioDelay: clampedDelay })
+  }
+
   return {
     // State
     activeSlideIndex,
@@ -414,6 +421,7 @@ export const useSlidesStore = defineStore('slides', () => {
     // Animation methods
     updateSlideProperties,
     updateElementAnimation,
-    setAnimationsEnabled
+    setAnimationsEnabled,
+    setAudioDelay
   }
 })

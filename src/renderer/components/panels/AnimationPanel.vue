@@ -241,6 +241,30 @@
         </div>
       </div>
 
+      <!-- Audio Sync -->
+      <div class="border-t pt-4">
+        <div class="flex items-center justify-between mb-2">
+          <div class="text-xs font-medium text-gray-500">Audio Delay</div>
+          <span class="text-xs text-gray-600">{{ (slide.audioDelay ?? 0.5).toFixed(1) }}s</span>
+        </div>
+        <input
+          type="range"
+          :value="slide.audioDelay ?? 0.5"
+          @input="updateAudioDelay(parseFloat(($event.target as HTMLInputElement).value))"
+          class="w-full accent-primary-600"
+          min="0"
+          max="2"
+          step="0.1"
+        />
+        <div class="flex justify-between text-[10px] text-gray-400 mt-1">
+          <span>0s (immediate)</span>
+          <span>2s (delayed)</span>
+        </div>
+        <p class="text-[10px] text-gray-500 mt-2">
+          Delays narration start to let animations complete before audio begins.
+        </p>
+      </div>
+
       <!-- Preview Button -->
       <button
         @click="startPreview"
@@ -384,6 +408,12 @@ function updateTransition(property: string, value: any) {
     [property]: value
   }
   emit('update', { transition })
+}
+
+function updateAudioDelay(delay: number) {
+  // Clamp between 0 and 2 seconds
+  const clampedDelay = Math.max(0, Math.min(2, delay))
+  emit('update', { audioDelay: clampedDelay })
 }
 
 function getBarColor(elementType: string): string {
